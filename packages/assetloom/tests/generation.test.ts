@@ -1,6 +1,7 @@
 import {
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   writeFile,
 } from 'node:fs/promises';
@@ -89,7 +90,7 @@ async function fixture() {
 
 describe('generation lifecycle', () => {
   it('writes once, verifies, and performs a no-op second run', async () => {
-    const { loaded } = await fixture();
+    const { directory, loaded } = await fixture();
     const first = await generate(loaded);
     expect(first.written.length).toBeGreaterThan(20);
 
@@ -97,6 +98,23 @@ describe('generation lifecycle', () => {
     expect(second.written).toEqual([]);
     expect(second.removed).toEqual([]);
     expect(second.unchanged.length).toBe(first.plan.tasks.length);
+
+    const cached = (
+      await readdir(path.join(directory, '.assetloom', 'cache'))
+    ).sort();
+    await writeFile(
+      path.join(directory, 'equivalent-config.json'),
+      await readFile(path.join(directory, 'assetloom.json')),
+    );
+    const equivalent = await loadConfiguration(
+      ['equivalent-config.json'],
+      { cwd: directory },
+    );
+    const third = await generate(equivalent);
+    expect(third.written).toEqual([]);
+    expect(
+      (await readdir(path.join(directory, '.assetloom', 'cache'))).sort(),
+    ).toEqual(cached);
 
     const result = await verify(loaded);
     expect(result.ok).toBe(true);
@@ -138,7 +156,13 @@ describe('generation lifecycle', () => {
         'utf8',
       ),
     ) as { files: Record<string, { sha256: string }> };
+    const cachedBeforeClean = (
+      await readdir(path.join(directory, '.assetloom', 'cache'))
+    ).sort();
     await clean(loaded);
+    expect(
+      (await readdir(path.join(directory, '.assetloom', 'cache'))).sort(),
+    ).toEqual(cachedBeforeClean);
     await generate(loaded);
     const after = JSON.parse(
       await readFile(

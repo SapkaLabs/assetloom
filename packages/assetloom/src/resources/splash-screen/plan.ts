@@ -28,6 +28,7 @@ function renderTask(options: {
     resourceType: 'splash-screen',
     target: options.target,
     operation: 'render',
+    renderMode: 'standard',
     sourceDependencies: [options.source],
     width: options.width,
     height: options.width,

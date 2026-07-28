@@ -2,6 +2,7 @@ import path from 'node:path';
 import { LoomError } from '../../domain/errors.js';
 import type {
   AppIconResource,
+  GenerationRenderMode,
   GenerationTask,
   TargetPlatform,
 } from '../../domain/types.js';
@@ -23,6 +24,7 @@ function renderTask(options: {
   source: string;
   width: number;
   destination: string;
+  renderMode?: GenerationRenderMode;
 }): GenerationTask {
   return {
     id: options.id,
@@ -30,6 +32,7 @@ function renderTask(options: {
     resourceType: 'app-icon',
     target: options.target,
     operation: 'render',
+    renderMode: options.renderMode ?? 'standard',
     sourceDependencies: [options.source],
     width: options.width,
     height: options.width,
@@ -142,6 +145,7 @@ export function planAndroidAppIcon(
             target: 'android',
             source: monochrome,
             width,
+            renderMode: 'monochrome',
             destination: path.join(
               resourceDirectory,
               `mipmap-${density}`,
@@ -235,6 +239,7 @@ export function planIosAppIcon(
         target: 'ios',
         source,
         width: 1024,
+        renderMode: appearance === 'tinted' ? 'tinted' : 'standard',
         destination: path.join(directory, `AppIcon-${appearance}.png`),
       }),
     );

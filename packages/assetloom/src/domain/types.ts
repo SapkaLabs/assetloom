@@ -8,12 +8,15 @@ export type GenerationOperation =
   | 'write-xml'
   | 'update-project';
 
+export type GenerationRenderMode = 'standard' | 'monochrome' | 'tinted';
+
 export interface GenerationTask {
   id: string;
   resourceId: string;
   resourceType: string;
   target: 'android' | 'ios';
   operation: GenerationOperation;
+  renderMode?: GenerationRenderMode;
   sourceDependencies: string[];
   width?: number;
   height?: number;

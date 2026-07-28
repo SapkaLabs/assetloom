@@ -86,17 +86,23 @@ export class SharpRenderer {
     }
     validateSvg(source, sourcePath);
 
+    const renderProfile = {
+      alpha:
+        task.target === 'ios' && task.resourceType === 'app-icon'
+          ? 'flatten-white'
+          : 'preserve',
+      color: task.renderMode ?? 'standard',
+    };
     const renderParameters = JSON.stringify({
       engine: `sharp-${sharp.versions.sharp}`,
-      rendererRevision: 2,
+      rendererRevision: 3,
       source: sha256(source),
-      task: {
-        resourceType: task.resourceType,
-        id: task.id.replace(/:(?:mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi|[123]x)$/, ''),
+      output: {
         width: task.width,
         height: task.height,
         format: task.format,
         presetVersion: task.presetVersion,
+        renderProfile,
       },
     });
     const cacheIndex = sha256(renderParameters);
@@ -124,19 +130,16 @@ export class SharpRenderer {
           fit: 'contain',
           background: { r: 0, g: 0, b: 0, alpha: 0 },
         });
-      if (task.target === 'ios' && task.resourceType === 'app-icon') {
+      if (renderProfile.alpha === 'flatten-white') {
         pipeline = pipeline
           .flatten({ background: '#FFFFFF' })
           .removeAlpha();
       } else {
         pipeline = pipeline.ensureAlpha();
       }
-      if (
-        task.resourceType === 'notification-icon' ||
-        task.id.includes('adaptive-monochrome')
-      ) {
+      if (renderProfile.color === 'monochrome') {
         pipeline = pipeline.greyscale().tint('#FFFFFF');
-      } else if (task.id.endsWith(':ios:tinted')) {
+      } else if (renderProfile.color === 'tinted') {
         pipeline = pipeline.greyscale();
       }
 

@@ -65,6 +65,10 @@ content is not rewritten, and cleanup refuses to remove an owned path whose
 content was changed outside Assetloom. Keep `.assetloom/` and generated native
 resources locally Git-ignored.
 
+The content-addressed render cache survives configuration switches and
+`assetloom clean`. Cache reuse depends on the effective source bytes and render
+settings, not on configuration filenames or resource names.
+
 The JSON Schema is exported as `@sapkalabs/assetloom/schema`.
 
 Documentation:

@@ -22,6 +22,7 @@ export type {
   ConfigurationProvenance,
   GenerationOperation,
   GenerationPlan,
+  GenerationRenderMode,
   GenerationResult,
   GenerationTask,
   IosTargetConfiguration,

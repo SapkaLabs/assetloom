@@ -123,6 +123,11 @@ Keep generated resource paths and `.assetloom/` locally Git-ignored. Assetloom
 tracks ownership in its manifest, avoids unchanged writes, and never cleans
 files it does not own.
 
+Rendered assets remain cached across brand switches. Reuse is based on the
+merged configuration's effective source bytes and render settings, not the
+configuration filenames or resource names; `assetloom clean` leaves this cache
+intact.
+
 See the [package guide](packages/assetloom/README.md) and
 [configuration reference](docs/configuration.md) for splash screens,
 notification icons, Icon Composer packages, and all CLI options.

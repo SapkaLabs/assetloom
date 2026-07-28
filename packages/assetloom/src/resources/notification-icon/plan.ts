@@ -26,6 +26,7 @@ export function planAndroidNotificationIcon(
       resourceType: resource.type,
       target: 'android',
       operation: 'render',
+      renderMode: 'monochrome',
       sourceDependencies: [source],
       width,
       height: width,
