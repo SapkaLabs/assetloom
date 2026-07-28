@@ -13,6 +13,11 @@ jobs:
         with:
           node-version: 24
           cache: yarn
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.1
+          bundler-cache: true
+          working-directory: apps/demo-react-native
       - run: corepack enable
       - run: yarn install --immutable
       - run: yarn build
@@ -20,6 +25,9 @@ jobs:
       - name: Generate fixture resources
         working-directory: fixtures/ios-native
         run: node ../../packages/assetloom/lib/cli.js generate -c assetloom.json
+      - name: Verify fixture resources
+        working-directory: fixtures/ios-native
+        run: node ../../packages/assetloom/lib/cli.js verify -c assetloom.json
       - name: Compile fixture with Xcode
         working-directory: fixtures/ios-native
         run: >-
@@ -31,11 +39,13 @@ jobs:
           CODE_SIGNING_ALLOWED=NO
           build
 
+      - name: Install demo CocoaPods
+        working-directory: apps/demo-react-native
+        run: bundle exec pod install --project-directory=ios
       - name: Generate bare React Native demo resources
         run: yarn workspace assetloom-demo assets:generate
-      - name: Install demo CocoaPods
-        working-directory: apps/demo-react-native/ios
-        run: pod install
+      - name: Verify bare React Native demo resources
+        run: yarn workspace assetloom-demo assets:verify
       - name: Compile bare React Native demo
         working-directory: apps/demo-react-native/ios
         run: >-

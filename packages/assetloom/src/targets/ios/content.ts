@@ -199,13 +199,19 @@ function addProjectResource(
   source: string,
   projectFile: string,
   resourcePath: string,
-  fileType: 'file.storyboard' | 'folder',
+  fileType: 'file.storyboard' | 'folder.iconcomposer.icon',
 ): string {
   const normalizedPath = resourcePath.split(path.sep).join('/');
   const pathValue = /^[A-Za-z0-9_./-]+$/.test(normalizedPath)
     ? normalizedPath
     : JSON.stringify(normalizedPath);
   if (source.includes(`path = ${pathValue};`)) {
+    if (fileType === 'folder.iconcomposer.icon') {
+      return source.replace(
+        `lastKnownFileType = folder; path = ${pathValue};`,
+        `lastKnownFileType = folder.iconcomposer.icon; path = ${pathValue};`,
+      );
+    }
     return source;
   }
   if (source.includes('PBXFileSystemSynchronizedRootGroup')) {
@@ -337,7 +343,7 @@ async function updateProject(
         source,
         task.destination,
         relative,
-        'folder',
+        'folder.iconcomposer.icon',
       );
     }
     return Buffer.from(source.endsWith('\n') ? source : `${source}\n`);

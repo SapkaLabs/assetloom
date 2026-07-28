@@ -94,7 +94,9 @@ describe('Icon Composer passthrough', () => {
       path.join(root, 'ios', 'Demo.xcodeproj', 'project.pbxproj'),
       'utf8',
     );
-    expect(updatedProject).toContain('lastKnownFileType = folder');
+    expect(updatedProject).toContain(
+      'lastKnownFileType = folder.iconcomposer.icon',
+    );
     expect(updatedProject).toContain(
       'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon',
     );

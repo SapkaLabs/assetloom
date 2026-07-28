@@ -1,15 +1,9 @@
 import React from 'react';
-import {
-  SafeAreaView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StatusBar, StyleSheet, Text, View } from 'react-native';
 
 export default function App(): React.JSX.Element {
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <StatusBar barStyle="light-content" />
       <View style={styles.card}>
         <Text style={styles.eyebrow}>SAPKALABS</Text>
@@ -18,7 +12,7 @@ export default function App(): React.JSX.Element {
           Native Android and iOS resources generated before compilation.
         </Text>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

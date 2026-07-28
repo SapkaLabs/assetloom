@@ -13,7 +13,10 @@
     "typecheck": "yarn workspace @sapkalabs/assetloom typecheck && yarn workspace assetloom-demo typecheck",
     "test": "yarn workspace @sapkalabs/assetloom test",
     "benchmark": "yarn workspace @sapkalabs/assetloom benchmark",
-    "pack:smoke": "yarn workspace @sapkalabs/assetloom pack:smoke"
+    "pack:smoke": "yarn workspace @sapkalabs/assetloom pack:smoke",
+    "demo:start": "yarn workspace assetloom-demo start",
+    "demo:android": "yarn workspace assetloom-demo android",
+    "demo:ios": "yarn workspace assetloom-demo ios"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
