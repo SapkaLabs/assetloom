@@ -25,6 +25,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn build",
     "lint": "eslint src tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
