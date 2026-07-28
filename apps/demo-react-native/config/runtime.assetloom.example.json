@@ -1,0 +1,27 @@
+{
+  "resources": {
+    "appIcon": {
+      "android": {
+        "adaptive": {
+          "background": {
+            "color": null,
+            "source": "./assets/source/android-background.svg"
+          }
+        }
+      },
+      "ios": {
+        "mode": "icon-composer",
+        "light": null,
+        "dark": null,
+        "tinted": null,
+        "source": "./assets/source/sample.icon",
+        "name": "AppIcon"
+      }
+    },
+    "notificationIcon": {
+      "android": {
+        "color": "#FF7A59"
+      }
+    }
+  }
+}

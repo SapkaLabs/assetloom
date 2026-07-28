@@ -1,0 +1,18 @@
+{
+  "resources": {
+    "appIcon": {
+      "android": {
+        "adaptive": {
+          "background": {
+            "color": "#223153"
+          }
+        }
+      }
+    },
+    "notificationIcon": {
+      "android": {
+        "color": "#69E0BA"
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+# Runtime and dependency state
+.assetloom/
+node_modules/
+
+# Android generated native resources
+android/app/src/main/res/mipmap-*/ic_launcher.png
+android/app/src/main/res/mipmap-*/ic_launcher_round.png
+android/app/src/main/res/mipmap-*/ic_launcher_foreground.png
+android/app/src/main/res/mipmap-*/ic_launcher_background.png
+android/app/src/main/res/mipmap-*/ic_launcher_monochrome.png
+android/app/src/main/res/drawable-*/assetloom_notification.png
+android/app/src/main/res/drawable-*/assetloom_splash.png
+android/app/src/main/res/drawable-night-*/assetloom_splash.png
+android/app/src/main/res/drawable/assetloom_splash_screen.xml
+android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
+android/app/src/main/res/values/assetloom.xml
+android/app/src/main/res/values-night/assetloom.xml
+android/app/src/main/res/values-v31/assetloom.xml
+
+# iOS generated native resources
+ios/AssetloomDemo/Images.xcassets/AppIcon.appiconset/
+ios/AssetloomDemo/Images.xcassets/AssetloomSplash.imageset/
+ios/AssetloomDemo/Images.xcassets/AssetloomSplashBackground.colorset/
+ios/AssetloomDemo/AssetloomLaunchScreen.storyboard
+ios/AssetloomDemo/*.icon/
+
+# Native build products
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+ios/Pods/
+ios/build/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/

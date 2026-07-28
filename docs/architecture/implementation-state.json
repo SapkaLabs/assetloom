@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "authoritativeScope": "native-android-ios-v1",
+  "lastUpdated": "2026-07-28",
+  "completed": [
+    "official platform research",
+    "architecture and ADRs",
+    "workspace and ESM package skeleton",
+    "ordered configuration merge and provenance",
+    "native-only JSON Schema",
+    "stable LoomError abstraction",
+    "deterministic planner",
+    "renderer and content cache",
+    "manifest, locking, atomic writes, safe cleanup",
+    "Android resource generation",
+    "iOS resource generation",
+    "bare React Native demo scaffold",
+    "native verification fixtures",
+    "security review",
+    "performance baseline",
+    "cross-platform and native CI definitions"
+  ],
+  "verification": {
+    "build": "pass",
+    "lint": "pass",
+    "typecheck": "pass-package-and-demo",
+    "tests": "pass-13",
+    "packageSmoke": "pass",
+    "androidNative": "pass-fixture-resources-and-demo-assembleDebug",
+    "iosPortable": "pass-catalog-images-storyboard-and-pbx-parse",
+    "iosNative": "pending-macos-ci",
+    "determinism": "pass-zero-writes-on-unchanged-second-run",
+    "benchmark": "pass-cold-221.14ms-warm-19.18ms"
+  },
+  "next": [
+    "obtain a green macOS native-ios workflow run",
+    "record release-CI benchmark baselines",
+    "replace the demo .icon placeholder before making passthrough visual claims"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "root": "."
+  },
+  "targets": {
+    "ios": {
+      "enabled": true,
+      "projectDirectory": "./AssetloomFixture",
+      "projectFile": "./AssetloomFixture.xcodeproj/project.pbxproj",
+      "assetCatalogDirectory": "./AssetloomFixture/Images.xcassets"
+    }
+  },
+  "resources": {
+    "appIcon": {
+      "type": "app-icon",
+      "ios": {
+        "mode": "variants",
+        "light": {
+          "source": "./source/icon-light.svg"
+        },
+        "dark": {
+          "source": "./source/icon-dark.svg"
+        },
+        "tinted": {
+          "source": "./source/icon-tinted.svg"
+        }
+      }
+    },
+    "splash": {
+      "type": "splash-screen",
+      "light": {
+        "image": "./source/splash.svg",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 160
+      },
+      "dark": {
+        "image": "./source/splash.svg",
+        "backgroundColor": "#000000",
+        "imageWidth": 160
+      }
+    }
+  }
+}

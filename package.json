@@ -1,0 +1,26 @@
+{
+  "name": "assetloom-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "yarn@4.9.2",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "yarn workspace @sapkalabs/assetloom build",
+    "lint": "yarn workspace @sapkalabs/assetloom lint",
+    "typecheck": "yarn workspace @sapkalabs/assetloom typecheck && yarn workspace assetloom-demo typecheck",
+    "test": "yarn workspace @sapkalabs/assetloom test",
+    "benchmark": "yarn workspace @sapkalabs/assetloom benchmark",
+    "pack:smoke": "yarn workspace @sapkalabs/assetloom pack:smoke"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.3.0",
+    "eslint": "10.0.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
+}

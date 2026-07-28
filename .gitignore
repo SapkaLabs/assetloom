@@ -141,3 +141,7 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Assetloom runtime state and generated package output
+**/.assetloom/
+packages/assetloom/lib/

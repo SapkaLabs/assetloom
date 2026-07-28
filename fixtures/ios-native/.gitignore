@@ -1,0 +1,7 @@
+.assetloom/
+AssetloomFixture/Images.xcassets/AppIcon.appiconset/
+AssetloomFixture/Images.xcassets/AssetloomSplash.imageset/
+AssetloomFixture/Images.xcassets/AssetloomSplashBackground.colorset/
+AssetloomFixture/AssetloomLaunchScreen.storyboard
+build/
+DerivedData/

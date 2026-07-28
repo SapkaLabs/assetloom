@@ -1,0 +1,76 @@
+{
+  "$schema": "../../../node_modules/@sapkalabs/assetloom/schema/config.schema.json",
+  "schemaVersion": 1,
+  "project": {
+    "root": "."
+  },
+  "targets": {
+    "android": {
+      "enabled": true,
+      "resourceDirectory": "./android/app/src/main/res",
+      "manifestPath": "./android/app/src/main/AndroidManifest.xml"
+    },
+    "ios": {
+      "enabled": true,
+      "projectDirectory": "./ios/AssetloomDemo",
+      "projectFile": "./ios/AssetloomDemo.xcodeproj/project.pbxproj",
+      "assetCatalogDirectory": "./ios/AssetloomDemo/Images.xcassets"
+    }
+  },
+  "resources": {
+    "appIcon": {
+      "type": "app-icon",
+      "android": {
+        "legacy": {
+          "source": "./assets/source/android-legacy.svg"
+        },
+        "round": {
+          "source": "./assets/source/android-round.svg"
+        },
+        "adaptive": {
+          "foreground": {
+            "source": "./assets/source/android-foreground.svg"
+          },
+          "background": {
+            "color": "#172033"
+          },
+          "monochrome": {
+            "source": "./assets/source/android-monochrome.svg"
+          }
+        }
+      },
+      "ios": {
+        "mode": "variants",
+        "light": {
+          "source": "./assets/source/ios-light.svg"
+        },
+        "dark": {
+          "source": "./assets/source/ios-dark.svg"
+        },
+        "tinted": {
+          "source": "./assets/source/ios-tinted.svg"
+        }
+      }
+    },
+    "notificationIcon": {
+      "type": "notification-icon",
+      "android": {
+        "source": "./assets/source/notification.svg",
+        "color": "#172033"
+      }
+    },
+    "splash": {
+      "type": "splash-screen",
+      "light": {
+        "image": "./assets/source/splash.svg",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 200
+      },
+      "dark": {
+        "image": "./assets/source/splash-dark.svg",
+        "backgroundColor": "#000000",
+        "imageWidth": 200
+      }
+    }
+  }
+}
