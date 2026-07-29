@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { Command, CommanderError, Option } from 'commander';
 import { clean, generate } from '../api/generate.js';
+import { createHtmlReport } from '../api/report.js';
 import { loadConfiguration } from '../config/load.js';
 import { asLoomError, LoomError } from '../domain/errors.js';
 import type { TargetPlatform } from '../domain/types.js';
@@ -15,6 +16,15 @@ interface CommonCommandOptions {
 
 interface VerifyCommandOptions extends CommonCommandOptions {
   native?: boolean;
+}
+
+interface GenerateCommandOptions extends CommonCommandOptions {
+  report?: boolean;
+  reportOutput?: string;
+}
+
+interface ReportCommandOptions extends CommonCommandOptions {
+  output?: string;
 }
 
 function collect(value: string, previous: string[]): string[] {
@@ -103,32 +113,92 @@ export function createProgram(): Command {
 
   addCommonOptions(
     program.command('generate').description('generate and publish native resources'),
-  ).action(async (options: CommonCommandOptions, command: Command) => {
-    const loaded = await loadConfiguration(options.config);
-    const target = targetOption(options.target);
-    const result = await generate(loaded, {
-      ...(target === undefined ? {} : { target }),
-    });
-    printResult(
-      {
-        ok: true,
-        result: {
-          targets: result.plan.targets,
-          written: result.written.map((item) =>
-            path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
-          ),
-          unchanged: result.unchanged.map((item) =>
-            path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
-          ),
-          removed: result.removed.map((item) =>
-            path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
-          ),
+  )
+    .option('--report', 'also create a self-contained HTML asset report')
+    .option(
+      '--report-output <file>',
+      'report path relative to the project root; implies --report',
+    )
+    .action(async (options: GenerateCommandOptions, command: Command) => {
+      const loaded = await loadConfiguration(options.config);
+      const target = targetOption(options.target);
+      const result = await generate(loaded, {
+        ...(target === undefined ? {} : { target }),
+      });
+      const report =
+        options.report === true || options.reportOutput !== undefined
+          ? await createHtmlReport(loaded, {
+              ...(target === undefined ? {} : { target }),
+              ...(options.reportOutput === undefined
+                ? {}
+                : { output: options.reportOutput }),
+            })
+          : undefined;
+      const humanReport =
+        report === undefined
+          ? ''
+          : `\nReport: ${path.relative(loaded.projectRoot, report.path).split(path.sep).join('/')} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
+      printResult(
+        {
+          ok: true,
+          result: {
+            targets: result.plan.targets,
+            written: result.written.map((item) =>
+              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+            ),
+            unchanged: result.unchanged.map((item) =>
+              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+            ),
+            removed: result.removed.map((item) =>
+              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+            ),
+            ...(report === undefined
+              ? {}
+              : {
+                  report: {
+                    ...report,
+                    path: path
+                      .relative(loaded.projectRoot, report.path)
+                      .split(path.sep)
+                      .join('/'),
+                  },
+                }),
+          },
         },
-      },
-      rootOptions(command),
-      `Generated ${result.written.length} changed file(s); ${result.unchanged.length} unchanged; ${result.removed.length} stale file(s) removed.`,
-    );
-  });
+        rootOptions(command),
+        `Generated ${result.written.length} changed file(s); ${result.unchanged.length} unchanged; ${result.removed.length} stale file(s) removed.${humanReport}`,
+      );
+    });
+
+  addCommonOptions(
+    program
+      .command('report')
+      .description('create a self-contained HTML review of generated assets'),
+  )
+    .option(
+      '-o, --output <file>',
+      'report path relative to the project root',
+    )
+    .action(async (options: ReportCommandOptions, command: Command) => {
+      const loaded = await loadConfiguration(options.config);
+      const target = targetOption(options.target);
+      const result = await createHtmlReport(loaded, {
+        ...(target === undefined ? {} : { target }),
+        ...(options.output === undefined ? {} : { output: options.output }),
+      });
+      const reportPath = path
+        .relative(loaded.projectRoot, result.path)
+        .split(path.sep)
+        .join('/');
+      printResult(
+        {
+          ok: true,
+          result: { ...result, path: reportPath },
+        },
+        rootOptions(command),
+        `Created ${reportPath} for "${result.configurationName}": ${result.outputs} output(s), ${result.sources} source(s), ${result.issues} issue(s).`,
+      );
+    });
 
   addCommonOptions(
     program.command('verify').description('verify generated native resources'),

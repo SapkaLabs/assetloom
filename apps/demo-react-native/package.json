@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "assets:generate": "assetloom generate -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
+    "assets:generate": "assetloom generate -c config/base.assetloom.json -c config/demo-brand.assetloom.json --report",
     "assets:plan": "assetloom plan -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
+    "assets:report": "assetloom report -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
     "assets:verify": "assetloom verify -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
     "android": "yarn assets:generate && react-native run-android",
     "ios": "yarn assets:generate && react-native run-ios",

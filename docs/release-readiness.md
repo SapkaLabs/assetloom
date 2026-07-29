@@ -1,6 +1,6 @@
 # Release-readiness report
 
-Date: 2026-07-28.
+Date: 2026-07-29.
 
 Overall status: pre-release. The native Android evidence remains green and both
 iOS native projects now build locally on macOS. A green hosted macOS workflow
@@ -31,12 +31,17 @@ and the release-record checks are still required before publishing.
   regression-tested.
 - Fixture generation reports 14 unchanged files and zero writes on an unchanged
   second run. Demo generation reports 56 unchanged files and zero writes.
+- Per-configuration HTML reporting embeds source artwork and all generated
+  output bytes in a single offline file. The demo report inspected 10 unique
+  sources and 56 outputs with zero integrity issues; its Android/iOS filters
+  and layout were browser-reviewed with no console or network errors. An
+  unchanged second report performs no write.
 - Root `git status` is identical before and after generation. Generated native
   resources, `.assetloom/`, CocoaPods, Xcode workspaces, and build products are
   ignored without replacing existing ignore content.
 - The Darwin arm64 benchmark with Node 26.3.0 completed 24 tasks in 82.26 ms
   cold and 8.14 ms warm, with 24 cold writes and zero warm writes.
-- Root lint, package and demo typechecking, 13 tests, build, packed-package smoke
+- Root lint, package and demo typechecking, 18 tests, build, packed-package smoke
   test, generation verification, and native builds pass locally.
 - Cross-platform quality CI and explicit Android/iOS native CI are configured.
 - The prohibited dependency and public-export audits find no Expo dependency,

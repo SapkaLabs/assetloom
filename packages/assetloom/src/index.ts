@@ -1,6 +1,8 @@
 export { clean, generate } from './api/generate.js';
 export type { GenerateOptions } from './api/generate.js';
 export { createGenerationPlan, parseTarget } from './api/plan.js';
+export { createHtmlReport } from './api/report.js';
+export type { CreateHtmlReportOptions } from './api/report.js';
 export { verify } from './api/verify.js';
 export type { VerifyOptions } from './api/verify.js';
 export { loadConfiguration } from './config/load.js';
@@ -19,6 +21,7 @@ export type {
   AppIconResource,
   AndroidTargetConfiguration,
   AssetloomConfiguration,
+  ConfigurationMetadata,
   ConfigurationProvenance,
   GenerationOperation,
   GenerationPlan,
@@ -26,10 +29,12 @@ export type {
   GenerationResult,
   GenerationTask,
   IosTargetConfiguration,
+  HtmlReportResult,
   LoadedConfiguration,
   NotificationIconResource,
   ProvenanceEntry,
   ResourceConfiguration,
+  ReportFileStatus,
   SourceReference,
   SplashAppearance,
   SplashScreenResource,

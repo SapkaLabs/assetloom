@@ -66,7 +66,8 @@ Add generation to the normal React Native commands:
 {
   "scripts": {
     "assets:plan": "assetloom plan -c assetloom.json",
-    "assets:generate": "assetloom generate -c assetloom.json",
+    "assets:generate": "assetloom generate -c assetloom.json --report",
+    "assets:report": "assetloom report -c assetloom.json",
     "assets:verify": "assetloom verify -c assetloom.json",
     "android": "yarn assets:generate && react-native run-android",
     "ios": "yarn assets:generate && react-native run-ios"
@@ -95,13 +96,18 @@ defaults in a base configuration, then merge a brand file last:
 ```sh
 assetloom generate \
   -c config/base.assetloom.json \
-  -c config/brands/acme.assetloom.json
+  -c config/brands/acme.assetloom.json \
+  --report
 ```
 
 A brand file only needs to override its own artwork or colors:
 
 ```json
 {
+  "metadata": {
+    "name": "Acme",
+    "description": "Production artwork for the Acme applications."
+  },
   "resources": {
     "appIcon": {
       "android": {
@@ -118,6 +124,13 @@ A brand file only needs to override its own artwork or colors:
 Configuration files merge in command-line order. Objects merge recursively,
 arrays replace earlier arrays, and `null` removes an inherited value. A build
 service can produce the final brand file at runtime and pass it last.
+
+`--report` creates a professional, self-contained dashboard at
+`.assetloom/reports/acme.html`. It embeds both configured source artwork and
+the native files that were actually generated, including integrity status,
+dimensions, densities, appearances, and platform-context previews. Give each
+brand a distinct `metadata.name` and generate every configuration to retain an
+independent visual snapshot. See the [HTML reporting guide](docs/reporting.md).
 
 Keep generated resource paths and `.assetloom/` locally Git-ignored. Assetloom
 tracks ownership in its manifest, avoids unchanged writes, and never cleans

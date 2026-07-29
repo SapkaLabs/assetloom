@@ -7,13 +7,18 @@ compilation.
 ```sh
 yarn assets:plan
 yarn assets:generate
+yarn assets:report
 yarn assets:verify
 yarn android
 yarn ios
 ```
 
 `base.assetloom.json` defines both native targets and all resource kinds.
-`demo-brand.assetloom.json` is merged second and overrides brand colors.
+`demo-brand.assetloom.json` is merged second, provides the human-readable report
+identity, and overrides brand colors. `assets:generate` also creates the
+self-contained report at
+`.assetloom/reports/assetloom-demo-brand.html`. Open or copy that single file;
+all source and generated artwork is embedded.
 
 For a dynamic white-label build, produce another JSON file at runtime and pass
 it last:

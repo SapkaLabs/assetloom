@@ -12,6 +12,24 @@ Files merge in the supplied order:
 Paths are resolved from `project.root`, which is resolved from the CLI working
 directory. Source paths and output paths must remain inside that root.
 
+## Configuration metadata
+
+Give every final customer configuration a human-readable identity:
+
+```json
+{
+  "metadata": {
+    "name": "Acme Banking",
+    "description": "Production artwork for the Acme mobile applications."
+  }
+}
+```
+
+`metadata` is optional for backward compatibility. When it is present, `name`
+is required. Assetloom uses the merged name in HTML report headings and to
+derive the default report filename. A brand override should therefore set its
+own metadata after the shared base configuration.
+
 ## Targets
 
 Only Android and iOS are valid target keys:

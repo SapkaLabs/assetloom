@@ -86,6 +86,11 @@ export interface SplashScreenResource {
   dark?: SplashAppearance;
 }
 
+export interface ConfigurationMetadata {
+  name: string;
+  description?: string;
+}
+
 export type ResourceConfiguration =
   | AppIconResource
   | NotificationIconResource
@@ -94,6 +99,7 @@ export type ResourceConfiguration =
 export interface AssetloomConfiguration {
   $schema?: string;
   schemaVersion: 1;
+  metadata?: ConfigurationMetadata;
   project: {
     root: string;
   };
@@ -135,4 +141,22 @@ export interface VerificationResult {
   readonly ok: true;
   readonly checked: readonly string[];
   readonly skippedNativeChecks: readonly string[];
+}
+
+export type ReportFileStatus =
+  | 'valid'
+  | 'modified'
+  | 'missing'
+  | 'untracked'
+  | 'invalid';
+
+export interface HtmlReportResult {
+  readonly path: string;
+  readonly written: boolean;
+  readonly healthy: boolean;
+  readonly configurationName: string;
+  readonly configurationFingerprint: string;
+  readonly sources: number;
+  readonly outputs: number;
+  readonly issues: number;
 }
