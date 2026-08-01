@@ -31,6 +31,7 @@ It defines these catalog resource types:
 - `files`
 - `svg-components`
 - `image-variants`
+- `native-image-assets`
 - `web-app-branding`
 - `font-family`
 
@@ -64,8 +65,11 @@ ordering. Version 1 callers continue to use the existing native loading and
 planning APIs. Version-aware callers use the versioned loader and composite
 planner.
 
-React Native native icons, notification icons, splash screens, native image
-assets, and native font registration are not migrated by this decision.
+React Native native icons, notification icons, and splash screens continue to
+use the native planner. The catalog's `native-image-assets` resource expands a
+source collection into configured Android density resources and complete iOS
+image sets while preserving each source image's aspect ratio. Native font
+registration is not migrated by this decision.
 
 ## Compatibility
 

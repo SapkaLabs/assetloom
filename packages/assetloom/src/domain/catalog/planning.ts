@@ -96,8 +96,8 @@ export type ImageInput =
 export interface ResizeImageRecipe {
   readonly kind: 'resize';
   readonly input: ImageInput;
-  readonly width: number;
-  readonly height: number;
+  readonly width?: number;
+  readonly height?: number;
   readonly fit: ImageFit;
   readonly background?: string;
 }
@@ -136,8 +136,8 @@ export type ImageRecipe = RasterImageRecipe | IcoImageRecipe;
 
 export interface RenderImageArtifact extends GeneratedCatalogArtifactBase {
   readonly operation: 'render-image';
-  readonly width: number;
-  readonly height: number;
+  readonly width?: number;
+  readonly height?: number;
   readonly format: ImageOutputFormat;
   readonly quality?: number;
   readonly recipe: ImageRecipe;

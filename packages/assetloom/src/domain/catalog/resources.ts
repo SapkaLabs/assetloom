@@ -4,6 +4,7 @@ export type CatalogResourceType =
   | 'files'
   | 'svg-components'
   | 'image-variants'
+  | 'native-image-assets'
   | 'web-app-branding'
   | 'font-family';
 
@@ -61,6 +62,34 @@ export interface ImageVariantsResource {
   readonly type: 'image-variants';
   readonly source: SourceDefinition;
   readonly outputs: readonly ImageVariantOutput[];
+}
+
+export interface AndroidImageDensity {
+  readonly density: string;
+  readonly width: number;
+}
+
+export interface IosImageScale {
+  readonly scale: '1x' | '2x' | '3x';
+  readonly width: number;
+}
+
+export interface NativeImageAssetsResource {
+  readonly type: 'native-image-assets';
+  readonly source: SourceDefinition;
+  readonly output: {
+    readonly target: string;
+    readonly android?: {
+      readonly resourceDirectory: string;
+      readonly densities: readonly AndroidImageDensity[];
+    };
+    readonly ios?: {
+      readonly assetCatalogDirectory: string;
+      readonly scales: readonly IosImageScale[];
+    };
+  };
+  readonly format: Exclude<ImageOutputFormat, 'ico'>;
+  readonly quality?: number;
 }
 
 export interface ForegroundScalePolicy {
@@ -180,6 +209,7 @@ export type CatalogResourceDefinition =
   | FilesResource
   | SvgComponentsResource
   | ImageVariantsResource
+  | NativeImageAssetsResource
   | WebAppBrandingResource
   | FontFamilyResource;
 
@@ -190,6 +220,7 @@ export function isCatalogResource(
     resource.type === 'files' ||
     resource.type === 'svg-components' ||
     resource.type === 'image-variants' ||
+    resource.type === 'native-image-assets' ||
     resource.type === 'web-app-branding' ||
     resource.type === 'font-family'
   );
@@ -204,6 +235,8 @@ export function catalogResourceTargetIds(
     case 'image-variants':
     case 'font-family':
       return resource.outputs.map((output) => output.target);
+    case 'native-image-assets':
+      return [resource.output.target];
     case 'web-app-branding':
       return [resource.output.target];
   }

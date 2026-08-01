@@ -49,7 +49,11 @@ export class ImageArtifactMaterializer
   async materialize(
     artifact: RenderImageArtifact,
     context: CatalogMaterializationContext,
-  ): Promise<{ readonly content: Uint8Array; readonly width: number; readonly height: number }> {
+  ): Promise<{
+    readonly content: Uint8Array;
+    readonly width: number;
+    readonly height: number;
+  }> {
     const inputs = await this.#inputs(artifact, context);
     const parameters = JSON.stringify({
       engine: `sharp-${sharp.versions.sharp}`,
@@ -76,13 +80,32 @@ export class ImageArtifactMaterializer
           context: { taskId: artifact.id, cacheKey: cachedKey },
         });
       }
-      return { content: cached, width: artifact.width, height: artifact.height };
+      return this.#withDimensions(artifact, cached);
     }
 
     const output = await this.#render(artifact, inputs);
     const outputKey = await context.cache.put(output);
     await context.cache.putAlias(alias, Buffer.from(outputKey, 'ascii'));
-    return { content: output, width: artifact.width, height: artifact.height };
+    return this.#withDimensions(artifact, output);
+  }
+
+  async #withDimensions(artifact: RenderImageArtifact, content: Uint8Array): Promise<{
+    readonly content: Uint8Array;
+    readonly width: number;
+    readonly height: number;
+  }> {
+    if (artifact.format === 'ico') {
+      if (artifact.width === undefined || artifact.height === undefined) {
+        throw new LoomError({
+          code: 'LOOM_PLAN_INVALID',
+          message: 'ICO artifacts require explicit width and height.',
+          context: { taskId: artifact.id },
+        });
+      }
+      return { content, width: artifact.width, height: artifact.height };
+    }
+    const metadata = await sharp(content).metadata();
+    return { content, width: metadata.width, height: metadata.height };
   }
 
   async #inputs(

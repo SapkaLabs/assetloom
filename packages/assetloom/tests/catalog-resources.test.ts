@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { TextDecoder } from 'node:util';
+import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { CatalogMaterializationContext } from '../src/application/execution/contracts.js';
 import type { PlanningContext } from '../src/application/planning/contracts.js';
@@ -13,10 +14,12 @@ import type { ResolvedCatalogTarget } from '../src/domain/catalog/targets.js';
 import { targetId } from '../src/domain/catalog/targets.js';
 import { LoomError } from '../src/domain/errors.js';
 import { NodeSourceResolver } from '../src/infrastructure/sources/node-source-resolver.js';
+import { ImageArtifactMaterializer } from '../src/infrastructure/images/image-materializer.js';
 import { FilesResourceHandler } from '../src/resources/files/handler.js';
 import { CopyFileMaterializer } from '../src/resources/files/materialize.js';
 import { FontFamilyResourceHandler } from '../src/resources/font-family/handler.js';
 import { WriteTextMaterializer } from '../src/resources/font-family/materialize.js';
+import { NativeImageAssetsResourceHandler } from '../src/resources/native-image-assets/handler.js';
 import { SvgComponentsResourceHandler } from '../src/resources/svg-components/handler.js';
 import { SvgComponentMaterializer } from '../src/resources/svg-components/materialize.js';
 
@@ -36,6 +39,28 @@ function planningContext(projectRoot: string): PlanningContext {
   const target: ResolvedCatalogTarget = {
     id: targetId('generated'),
     kind: 'directory',
+    root,
+    configuration,
+  };
+  return {
+    projectRoot,
+    normalizedConfiguration: '{}',
+    sourceResolver: new NodeSourceResolver({ projectRoot }),
+    resolveTarget(id) {
+      if (id !== target.id) {
+        throw new Error(`Unexpected target: ${id}`);
+      }
+      return target;
+    },
+  };
+}
+
+function reactNativePlanningContext(projectRoot: string): PlanningContext {
+  const root = path.join(projectRoot, 'mobile-app');
+  const configuration = { kind: 'react-native-app' as const, root };
+  const target: ResolvedCatalogTarget = {
+    id: targetId('mobileApp'),
+    kind: 'react-native-app',
     root,
     configuration,
   };
@@ -345,6 +370,127 @@ describe('svg-components resource', () => {
         .filter((artifact) => artifact.operation === 'transform-svg')
         .map((artifact) => artifact.componentName),
     ).toEqual(['AddIcon', 'PlainIcon']);
+  });
+});
+
+describe('native-image-assets resource', () => {
+  it('plans Android densities and complete iOS image sets from a source collection', async () => {
+    const projectRoot = await fixture();
+    await mkdir(path.join(projectRoot, 'native-images'));
+    const source =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50"><rect width="100" height="50" fill="#123456"/></svg>';
+    await writeFile(path.join(projectRoot, 'native-images/welcome_1.svg'), source);
+    await writeFile(path.join(projectRoot, 'native-images/welcome_2.svg'), source);
+    const handler = new NativeImageAssetsResourceHandler();
+    const resource = {
+      type: 'native-image-assets' as const,
+      source: {
+        root: 'native-images',
+        include: ['**/*.svg'],
+        required: true,
+      },
+      output: {
+        target: 'mobileApp',
+        android: {
+          resourceDirectory: 'android/app/src/main/res',
+          densities: [
+            { density: 'mdpi', width: 480 },
+            { density: 'xhdpi', width: 960 },
+          ],
+        },
+        ios: {
+          assetCatalogDirectory: 'ios/Demo/Images.xcassets',
+          scales: [
+            { scale: '1x' as const, width: 480 },
+            { scale: '2x' as const, width: 960 },
+            { scale: '3x' as const, width: 1440 },
+          ],
+        },
+      },
+      format: 'jpeg' as const,
+      quality: 85,
+    };
+    handler.validate(resource);
+
+    const artifacts = await handler.plan(
+      'welcomeImages',
+      resource,
+      reactNativePlanningContext(projectRoot),
+    );
+    expect(artifacts).toHaveLength(12);
+    expect(
+      artifacts.filter((artifact) => artifact.operation === 'render-image'),
+    ).toHaveLength(10);
+    const mdpi = artifacts.find((artifact) =>
+      artifact.destination.endsWith(
+        path.join('drawable-mdpi', 'welcome_1.jpg'),
+      ),
+    );
+    if (mdpi === undefined || mdpi.operation !== 'render-image') {
+      throw new Error('Expected an Android mdpi image artifact.');
+    }
+    expect(mdpi).toMatchObject({
+      resourceType: 'native-image-assets',
+      width: 480,
+      format: 'jpeg',
+      quality: 85,
+      recipe: { kind: 'resize', width: 480, fit: 'inside' },
+    });
+    const materialized = await new ImageArtifactMaterializer().materialize(
+      mdpi,
+      materializationContext(projectRoot),
+    );
+    expect(await sharp(materialized.content).metadata()).toMatchObject({
+      format: 'jpeg',
+      width: 480,
+      height: 240,
+    });
+
+    const contents = artifacts.find((artifact) =>
+      artifact.destination.endsWith(
+        path.join('welcome_1.imageset', 'Contents.json'),
+      ),
+    );
+    if (contents === undefined || contents.operation !== 'write-text') {
+      throw new Error('Expected an iOS image-set Contents.json artifact.');
+    }
+    if (typeof contents.content !== 'string') {
+      throw new Error('Expected literal iOS image-set contents.');
+    }
+    expect(contents.dependsOn).toHaveLength(3);
+    expect(JSON.parse(contents.content)).toEqual({
+      images: [
+        { idiom: 'universal', scale: '1x', filename: 'welcome_1.jpg' },
+        { idiom: 'universal', scale: '2x', filename: 'welcome_1@2x.jpg' },
+        { idiom: 'universal', scale: '3x', filename: 'welcome_1@3x.jpg' },
+      ],
+      info: { version: 1, author: 'xcode' },
+    });
+  });
+
+  it('rejects Android-incompatible source names', async () => {
+    const projectRoot = await fixture();
+    await mkdir(path.join(projectRoot, 'native-images'));
+    await writeFile(path.join(projectRoot, 'native-images/Bad-Name.png'), 'invalid');
+    const handler = new NativeImageAssetsResourceHandler();
+    await expect(
+      handler.plan(
+        'badImages',
+        {
+          type: 'native-image-assets',
+          source: 'native-images/Bad-Name.png',
+          output: {
+            target: 'mobileApp',
+            android: {
+              resourceDirectory: 'android/app/src/main/res',
+              densities: [{ density: 'mdpi', width: 480 }],
+            },
+          },
+          format: 'png',
+        },
+        reactNativePlanningContext(projectRoot),
+      ),
+    ).rejects.toMatchObject({ code: 'LOOM_ANDROID_RESOURCE_INVALID' });
   });
 });
 

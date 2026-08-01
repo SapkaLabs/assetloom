@@ -6,6 +6,7 @@ import type {
   FilesResource,
   FontFamilyResource,
   ImageVariantsResource,
+  NativeImageAssetsResource,
   SvgComponentsResource,
   WebAppBrandingResource,
   CatalogResourceDefinition,
@@ -16,6 +17,7 @@ export interface ResourceHandlers {
   readonly files?: ResourceHandler<FilesResource>;
   readonly 'svg-components'?: ResourceHandler<SvgComponentsResource>;
   readonly 'image-variants'?: ResourceHandler<ImageVariantsResource>;
+  readonly 'native-image-assets'?: ResourceHandler<NativeImageAssetsResource>;
   readonly 'web-app-branding'?: ResourceHandler<WebAppBrandingResource>;
   readonly 'font-family'?: ResourceHandler<FontFamilyResource>;
 }
@@ -52,6 +54,13 @@ export class ResourceHandlerRegistry {
           resourceId,
           resource,
           this.#handlers['image-variants'],
+          context,
+        );
+      case 'native-image-assets':
+        return this.#planWith(
+          resourceId,
+          resource,
+          this.#handlers['native-image-assets'],
           context,
         );
       case 'web-app-branding':

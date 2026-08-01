@@ -97,6 +97,33 @@ function versionTwoConfiguration() {
           },
         ],
       },
+      onboarding: {
+        type: 'native-image-assets',
+        source: {
+          root: './assets/onboarding',
+          include: ['**/*.{png,jpg,jpeg}'],
+        },
+        output: {
+          target: 'mobileApp',
+          android: {
+            resourceDirectory: 'android/app/src/main/res',
+            densities: [
+              { density: 'mdpi', width: 480 },
+              { density: 'xhdpi', width: 960 },
+            ],
+          },
+          ios: {
+            assetCatalogDirectory: 'ios/App/Images.xcassets',
+            scales: [
+              { scale: '1x', width: 480 },
+              { scale: '2x', width: 960 },
+              { scale: '3x', width: 1440 },
+            ],
+          },
+        },
+        format: 'jpeg',
+        quality: 85,
+      },
       branding: {
         type: 'web-app-branding',
         preset: 'web-app-branding-v1',
@@ -254,6 +281,7 @@ describe('catalog architecture foundation', () => {
       'staticFiles',
       'icons',
       'preview',
+      'onboarding',
       'branding',
       'poppins',
     ]);

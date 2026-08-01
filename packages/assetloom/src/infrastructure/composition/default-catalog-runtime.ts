@@ -28,6 +28,7 @@ import { FontFamilyResourceHandler } from '../../resources/font-family/handler.j
 import { FontFileSignatureValidator } from '../../resources/font-family/signature.js';
 import { WriteTextMaterializer } from '../../resources/font-family/materialize.js';
 import { ImageVariantsResourceHandler } from '../../resources/image-variants/handler.js';
+import { NativeImageAssetsResourceHandler } from '../../resources/native-image-assets/handler.js';
 import { SvgComponentsResourceHandler } from '../../resources/svg-components/handler.js';
 import { SvgComponentMaterializer } from '../../resources/svg-components/materialize.js';
 import { WebAppBrandingResourceHandler } from '../../resources/web-app-branding/handler.js';
@@ -55,7 +56,10 @@ function assertImageDimensions(
   actualWidth: number | undefined,
   actualHeight: number | undefined,
 ): void {
-  if (actualWidth !== artifact.width || actualHeight !== artifact.height) {
+  if (
+    (artifact.width !== undefined && actualWidth !== artifact.width) ||
+    (artifact.height !== undefined && actualHeight !== artifact.height)
+  ) {
     throw new LoomError({
       code: 'LOOM_VERIFY_IMAGE_INVALID',
       message: 'Generated image dimensions differ from the generation plan.',
@@ -196,6 +200,7 @@ export function createDefaultCatalogRuntime(
       files: new FilesResourceHandler(),
       'svg-components': new SvgComponentsResourceHandler(),
       'image-variants': new ImageVariantsResourceHandler(),
+      'native-image-assets': new NativeImageAssetsResourceHandler(),
       'web-app-branding': new WebAppBrandingResourceHandler(),
       'font-family': new FontFamilyResourceHandler(),
     }),

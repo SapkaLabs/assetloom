@@ -257,6 +257,9 @@
             "$ref": "#/$defs/imageVariantsResource"
           },
           {
+            "$ref": "#/$defs/nativeImageAssetsResource"
+          },
+          {
             "$ref": "#/$defs/webAppBrandingResource"
           },
           {
@@ -542,6 +545,153 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 16384
+    },
+    "nativeImageAssetsResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "source",
+        "output",
+        "format"
+      ],
+      "properties": {
+        "type": {
+          "const": "native-image-assets"
+        },
+        "source": {
+          "$ref": "#/$defs/catalogSource"
+        },
+        "output": {
+          "$ref": "#/$defs/nativeImageAssetsOutput"
+        },
+        "format": {
+          "enum": [
+            "png",
+            "webp",
+            "jpeg"
+          ]
+        },
+        "quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "nativeImageAssetsOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "android"
+          ]
+        },
+        {
+          "required": [
+            "ios"
+          ]
+        }
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/targetId"
+        },
+        "android": {
+          "$ref": "#/$defs/nativeAndroidImageOutput"
+        },
+        "ios": {
+          "$ref": "#/$defs/nativeIosImageOutput"
+        }
+      }
+    },
+    "nativeAndroidImageOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceDirectory",
+        "densities"
+      ],
+      "properties": {
+        "resourceDirectory": {
+          "$ref": "#/$defs/path"
+        },
+        "densities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nativeAndroidImageDensity"
+          }
+        }
+      }
+    },
+    "nativeAndroidImageDensity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "density",
+        "width"
+      ],
+      "properties": {
+        "density": {
+          "enum": [
+            "ldpi",
+            "mdpi",
+            "tvdpi",
+            "hdpi",
+            "xhdpi",
+            "xxhdpi",
+            "xxxhdpi"
+          ]
+        },
+        "width": {
+          "$ref": "#/$defs/imageDimension"
+        }
+      }
+    },
+    "nativeIosImageOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetCatalogDirectory",
+        "scales"
+      ],
+      "properties": {
+        "assetCatalogDirectory": {
+          "$ref": "#/$defs/path"
+        },
+        "scales": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/nativeIosImageScale"
+          }
+        }
+      }
+    },
+    "nativeIosImageScale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scale",
+        "width"
+      ],
+      "properties": {
+        "scale": {
+          "enum": [
+            "1x",
+            "2x",
+            "3x"
+          ]
+        },
+        "width": {
+          "$ref": "#/$defs/imageDimension"
+        }
+      }
     },
     "imageFit": {
       "enum": [

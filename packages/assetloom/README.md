@@ -72,8 +72,8 @@ stacks for failures.
 ## Configurable resources (schema version 2)
 
 This minimal example copies shared files to both a React Native package and a
-dashboard, and converts an SVG preview into a web image. Native app assets can
-remain under schema version 1 until they are intentionally migrated.
+dashboard, converts an SVG preview into a web image, and expands onboarding
+artwork into Android density resources and iOS image sets.
 
 ```json
 {
@@ -83,6 +83,10 @@ remain under schema version 1 until they are intentionally migrated.
     "mobileComponents": {
       "kind": "react-native-library",
       "root": "./mobile/components"
+    },
+    "mobileApp": {
+      "kind": "react-native-app",
+      "root": "./mobile/app"
     },
     "dashboard": {
       "kind": "web-app",
@@ -118,6 +122,36 @@ remain under schema version 1 until they are intentionally migrated.
           "quality": 90
         }
       ]
+    },
+    "onboardingImages": {
+      "type": "native-image-assets",
+      "source": {
+        "root": "./assets/onboarding",
+        "include": ["**/*.{png,jpg,jpeg}"]
+      },
+      "output": {
+        "target": "mobileApp",
+        "android": {
+          "resourceDirectory": "android/app/src/main/res",
+          "densities": [
+            { "density": "mdpi", "width": 480 },
+            { "density": "hdpi", "width": 720 },
+            { "density": "xhdpi", "width": 960 },
+            { "density": "xxhdpi", "width": 1440 },
+            { "density": "xxxhdpi", "width": 1920 }
+          ]
+        },
+        "ios": {
+          "assetCatalogDirectory": "ios/App/Images.xcassets",
+          "scales": [
+            { "scale": "1x", "width": 480 },
+            { "scale": "2x", "width": 960 },
+            { "scale": "3x", "width": 1440 }
+          ]
+        }
+      },
+      "format": "jpeg",
+      "quality": 85
     }
   }
 }
