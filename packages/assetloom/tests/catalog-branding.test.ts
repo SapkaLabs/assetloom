@@ -274,6 +274,10 @@ describe('catalog web app branding', () => {
     if (html.integration.adapter !== 'html-head') {
       throw new Error('Expected HTML integration.');
     }
+    expect(html.dependsOn).toContain('brand:portal:manifest-integration');
+    expect(html.dependsOn).not.toContain(
+      'brand:portal:manifest-integration:published',
+    );
     const renderedKinds = html.integration.elements.map((element) =>
       element.element === 'title'
         ? 'title'

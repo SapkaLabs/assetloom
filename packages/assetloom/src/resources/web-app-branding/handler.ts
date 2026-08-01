@@ -562,10 +562,12 @@ export class WebAppBrandingResourceHandler
     );
     const maskableIcons = maskableIconEntries.map((entry) => entry.manifest);
 
+    let manifestArtifactId: string | undefined;
     let manifestResultId: string | undefined;
     if (resource.output.manifest !== undefined) {
       const manifestDestination = inside(target.root, resource.output.manifest);
       const manifestId = `${resourceId}:${target.id}:manifest-integration`;
+      manifestArtifactId = manifestId;
       manifestResultId = `${manifestId}:published`;
       artifacts.push({
         id: manifestId,
@@ -808,16 +810,23 @@ export class WebAppBrandingResourceHandler
         });
       }
       const referenceIds = new Set<string>();
+      const collectReference = (artifactId: string): void => {
+        referenceIds.add(
+          artifactId === manifestResultId && manifestArtifactId !== undefined
+            ? manifestArtifactId
+            : artifactId,
+        );
+      };
       const collect = (value: IntegrationValue): void => {
         if (typeof value === 'string') {
           return;
         }
         if (value.kind === 'artifact-output') {
-          referenceIds.add(value.artifactId);
+          collectReference(value.artifactId);
         } else {
           for (const part of value.parts) {
             if (typeof part !== 'string') {
-              referenceIds.add(part.artifactId);
+              collectReference(part.artifactId);
             }
           }
         }
