@@ -1,8 +1,13 @@
 # `@sapkalabs/assetloom`
 
-Assetloom generates deterministic Android and iOS application resources from
-SVG, PNG, or WebP source artwork. It is designed for native projects and bare
-React Native projects. Expo is not supported.
+Assetloom generates deterministic, configurable application resources for
+Android, iOS, React Native libraries and applications, web applications, and
+ordinary output directories. Schema version 2 supports files, SVG components,
+image variants, web branding, and fonts without hard-coded application names.
+
+Existing schema-version-1 Android and iOS configurations remain supported by
+the same CLI commands and continue through the original native planning,
+rendering, verification, manifest, and reporting paths. Expo is not supported.
 
 ## Install
 
@@ -10,8 +15,8 @@ React Native projects. Expo is not supported.
 yarn add --dev @sapkalabs/assetloom
 ```
 
-Create an `assetloom.json` in the application root. It declares the native
-project paths and resources to generate; see the
+Create an `assetloom.json` in the application root. It declares project targets
+and the resources to generate; see the
 [configuration reference](https://github.com/SapkaLabs/assetloom/blob/main/docs/configuration.md)
 for a complete example.
 
@@ -58,9 +63,85 @@ assetloom verify -c config/base.assetloom.json -c config/brand.assetloom.json
 assetloom clean -c config/base.assetloom.json -c config/brand.assetloom.json
 ```
 
-Filter generation or verification with `--target android` or `--target ios`.
+With schema version 1, filter generation or verification with `--target
+android` or `--target ios`. Schema version 2 accepts any configured target ID,
+for example `--target dashboard` or `--target mobileComponents`.
 Use `--json` for machine-readable output and `--verbose` to include diagnostic
 stacks for failures.
+
+## Configurable resources (schema version 2)
+
+This minimal example copies shared files to both a React Native package and a
+dashboard, and converts an SVG preview into a web image. Native app assets can
+remain under schema version 1 until they are intentionally migrated.
+
+```json
+{
+  "schemaVersion": 2,
+  "project": { "root": "." },
+  "targets": {
+    "mobileComponents": {
+      "kind": "react-native-library",
+      "root": "./mobile/components"
+    },
+    "dashboard": {
+      "kind": "web-app",
+      "root": "./web/dashboard",
+      "sourceDirectory": "src",
+      "publicDirectory": "public",
+      "publicBasePath": "/"
+    }
+  },
+  "resources": {
+    "sharedImages": {
+      "type": "files",
+      "source": {
+        "root": "./assets/images",
+        "include": ["**/*.{png,jpg,webp}"]
+      },
+      "outputs": [
+        { "target": "mobileComponents", "directory": "src/assets" },
+        { "target": "dashboard", "directory": "src/assets" }
+      ]
+    },
+    "socialPreview": {
+      "type": "image-variants",
+      "source": { "file": "./assets/social-preview.svg" },
+      "outputs": [
+        {
+          "target": "dashboard",
+          "path": "public/social-preview.webp",
+          "width": 1200,
+          "height": 630,
+          "format": "webp",
+          "fit": "cover",
+          "quality": 90
+        }
+      ]
+    }
+  }
+}
+```
+
+SVG components use the generic `themed-icon-v1` preset. Component names use
+only the source filename unless an explicit parent-directory policy is needed:
+
+```json
+{
+  "target": "mobileComponents",
+  "directory": "src/icons",
+  "runtime": "react-native",
+  "preset": "themed-icon-v1",
+  "naming": "pascal-case",
+  "componentNaming": {
+    "parentDirectoryPrefix": "F_",
+    "separator": "_"
+  }
+}
+```
+
+Web branding uses `web-app-branding-v1`; the built-in social overlay is
+selected with `overlayPreset: "product-overview-v1"`.
 
 `generate --report` writes a deterministic, self-contained HTML review to
 `.assetloom/reports/<configuration-name>.html`. It embeds configured source
@@ -77,6 +158,43 @@ content is not rewritten, and cleanup refuses to remove an owned path whose
 content was changed outside Assetloom. Keep `.assetloom/` and generated native
 resources locally Git-ignored.
 
+If generation is interrupted after publication starts, Assetloom retains
+`.assetloom/pending-generation.json`. Rerun `generate` with the same effective
+configuration and target selection to converge the remaining phases. Assetloom
+rejects changed inputs and blocks `clean`, `verify`, and `report` while that
+intent is pending so a partial publication cannot be mistaken for a complete
+one.
+
+Assetloom automatically recovers a stale same-host project lock only when the
+recorded PID is provably absent. A crash during that recovery can leave
+`.assetloom/lock.recovery`, which deliberately blocks further automatic
+recovery. Inspect it and clear it through the guarded, token-validated API:
+
+First stop every Assetloom process operating on the project. Exactly one
+recovery operator must perform the complete inspect-and-clear sequence; do not
+run this manual procedure concurrently from multiple terminals or automation
+workers.
+
+```js
+import {
+  clearAbandonedProjectLockRecoveryClaim,
+  inspectProjectLockRecoveryClaim,
+} from '@sapkalabs/assetloom';
+
+const inspection = await inspectProjectLockRecoveryClaim(process.cwd());
+if (inspection.status === 'held' && inspection.clearable) {
+  await clearAbandonedProjectLockRecoveryClaim(
+    process.cwd(),
+    inspection.claim.recoveryId,
+  );
+}
+```
+
+Only a valid same-host claim whose PID is definitely dead is clearable. Live or
+PID-reused processes, remote hosts, permission-denied probes, and malformed
+claims remain fail-closed. Do not delete the claim by hand; investigate the
+reported process identity and filesystem state instead.
+
 The content-addressed render cache survives configuration switches and
 `assetloom clean`. Cache reuse depends on the effective source bytes and render
 settings, not on configuration filenames or resource names.
@@ -85,6 +203,7 @@ The JSON Schema is exported as `@sapkalabs/assetloom/schema`.
 
 Documentation:
 
+- [CLI](https://github.com/SapkaLabs/assetloom/blob/main/docs/cli.md)
 - [Configuration](https://github.com/SapkaLabs/assetloom/blob/main/docs/configuration.md)
 - [HTML reports](https://github.com/SapkaLabs/assetloom/blob/main/docs/reporting.md)
 - [Error codes](https://github.com/SapkaLabs/assetloom/blob/main/docs/error-codes.md)

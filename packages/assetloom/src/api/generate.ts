@@ -26,6 +26,8 @@ import {
   ManifestStore,
 } from '../storage/manifest.js';
 import { ProjectLock } from '../storage/lock.js';
+import { PendingGenerationStore } from '../storage/pending-generation-store.js';
+import { ProjectStatePathGuard } from '../storage/state-path-guard.js';
 import { androidTaskContent } from '../targets/android/content.js';
 import { iosTaskContent } from '../targets/ios/content.js';
 
@@ -210,7 +212,7 @@ async function removeStaleFiles(
   projectRoot: string,
   previous: AssetloomManifest,
   nextFiles: Readonly<Record<string, ManifestFile>>,
-  targets: readonly TargetPlatform[],
+  targets: readonly string[],
 ): Promise<string[]> {
   const stale = Object.entries(previous.files).filter(
     ([relative, entry]) =>
@@ -287,9 +289,14 @@ export async function generate(
     options.target,
   );
   const stateDirectory = path.join(loaded.projectRoot, '.assetloom');
-  const lock = new ProjectLock(stateDirectory);
+  const statePaths = new ProjectStatePathGuard(loaded.projectRoot, stateDirectory);
+  const lock = new ProjectLock(stateDirectory, statePaths);
   await lock.acquire();
   try {
+    await new PendingGenerationStore(
+      stateDirectory,
+      statePaths,
+    ).assertNoPending('schema-v1 generate');
     const manifestStore = new ManifestStore(
       loaded.projectRoot,
       stateDirectory,
@@ -327,9 +334,10 @@ export async function generate(
       }
     }
 
+    const selectedTargetSet: ReadonlySet<string> = new Set(plan.targets);
     const retainedFiles = Object.fromEntries(
       Object.entries(previous.files).filter(
-        ([, entry]) => !plan.targets.includes(entry.target),
+        ([, entry]) => !selectedTargetSet.has(entry.target),
       ),
     );
     const nextFiles: Record<string, ManifestFile> = {
@@ -360,9 +368,14 @@ export async function clean(
   target?: TargetPlatform,
 ): Promise<readonly string[]> {
   const stateDirectory = path.join(loaded.projectRoot, '.assetloom');
-  const lock = new ProjectLock(stateDirectory);
+  const statePaths = new ProjectStatePathGuard(loaded.projectRoot, stateDirectory);
+  const lock = new ProjectLock(stateDirectory, statePaths);
   await lock.acquire();
   try {
+    await new PendingGenerationStore(
+      stateDirectory,
+      statePaths,
+    ).assertNoPending('schema-v1 clean');
     const manifestStore = new ManifestStore(
       loaded.projectRoot,
       stateDirectory,
@@ -370,9 +383,10 @@ export async function clean(
     const manifest = await manifestStore.load();
     const targets: readonly TargetPlatform[] =
       target === undefined ? ['android', 'ios'] : [target];
+    const selectedTargetSet: ReadonlySet<string> = new Set(targets);
     const retainedFiles = Object.fromEntries(
       Object.entries(manifest.files).filter(
-        ([, entry]) => !targets.includes(entry.target),
+        ([, entry]) => !selectedTargetSet.has(entry.target),
       ),
     );
     const removed = await removeStaleFiles(

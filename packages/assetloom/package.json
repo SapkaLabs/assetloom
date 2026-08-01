@@ -1,7 +1,7 @@
 {
   "name": "@sapkalabs/assetloom",
-  "version": "0.1.0",
-  "description": "Deterministic native Android and iOS application-resource generation",
+  "version": "0.2.0",
+  "description": "Deterministic configurable application-resource generation for native and web targets",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -33,12 +33,24 @@
     "pack:smoke": "yarn build && node ./scripts/pack-smoke.mjs"
   },
   "dependencies": {
+    "@babel/generator": "^7.29.7",
+    "@babel/parser": "^7.29.7",
+    "@babel/traverse": "^7.29.7",
+    "@babel/types": "^7.29.7",
+    "@svgr/core": "^8.1.0",
+    "@svgr/plugin-jsx": "^8.1.0",
+    "@svgr/plugin-prettier": "^8.1.0",
+    "@svgr/plugin-svgo": "^8.1.0",
     "ajv": "8.20.0",
     "commander": "15.0.0",
-    "sharp": "0.35.3"
+    "sharp": "0.35.3",
+    "tinyglobby": "^0.2.17"
   },
   "devDependencies": {
+    "@types/babel__generator": "^7.27.0",
+    "@types/babel__traverse": "^7.28.0",
     "@types/node": "24.3.0",
+    "eslint": "10.0.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10"
   }

@@ -2,16 +2,23 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LoomError } from '../domain/errors.js';
 import { sha256 } from './hash.js';
+import type { ProjectStatePathGuard } from './state-path-guard.js';
 
 export class ContentCache {
   readonly #directory: string;
+  readonly #statePaths: ProjectStatePathGuard | undefined;
 
-  constructor(stateDirectory: string) {
+  constructor(
+    stateDirectory: string,
+    statePaths?: ProjectStatePathGuard,
+  ) {
     this.#directory = path.join(stateDirectory, 'cache');
+    this.#statePaths = statePaths;
   }
 
   async get(key: string): Promise<Buffer | undefined> {
     const filename = path.join(this.#directory, key);
+    await this.#statePaths?.assertSafe(filename);
     try {
       const value = await readFile(filename);
       if (sha256(value) !== key) {
@@ -44,6 +51,7 @@ export class ContentCache {
 
   async getAlias(key: string): Promise<string | undefined> {
     const filename = path.join(this.#directory, key);
+    await this.#statePaths?.assertSafe(filename);
     try {
       const value = await readFile(filename, 'ascii');
       if (!/^[0-9a-f]{64}$/.test(value)) {
@@ -78,8 +86,10 @@ export class ContentCache {
     const key = sha256(value);
     const destination = path.join(this.#directory, key);
     const temporary = `${destination}.${process.pid}.tmp`;
+    await this.#statePaths?.assertSafe(destination);
     try {
       await mkdir(this.#directory, { recursive: true });
+      await this.#statePaths?.assertSafe(destination);
       try {
         await writeFile(temporary, value, { flag: 'wx' });
       } catch (error) {
@@ -125,8 +135,10 @@ export class ContentCache {
     }
     const destination = path.join(this.#directory, key);
     const temporary = `${destination}.${process.pid}.tmp`;
+    await this.#statePaths?.assertSafe(destination);
     try {
       await mkdir(this.#directory, { recursive: true });
+      await this.#statePaths?.assertSafe(destination);
       await writeFile(temporary, value, { flag: 'wx' });
       await rename(temporary, destination);
     } catch (cause) {

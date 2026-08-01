@@ -2,23 +2,84 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://sapkalabs.dev/assetloom/config.schema.json",
   "title": "Assetloom configuration",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "project",
-    "targets",
-    "resources"
+  "oneOf": [
+    {
+      "$ref": "#/$defs/configurationV1"
+    },
+    {
+      "$ref": "#/$defs/configurationV2"
+    }
   ],
-  "properties": {
-    "$schema": {
-      "type": "string"
+  "$defs": {
+    "configurationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "project",
+        "targets",
+        "resources"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        },
+        "project": {
+          "$ref": "#/$defs/project"
+        },
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "android": {
+              "$ref": "#/$defs/androidTarget"
+            },
+            "ios": {
+              "$ref": "#/$defs/iosTarget"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/$defs/nativeResources"
+        }
+      }
     },
-    "schemaVersion": {
-      "const": 1
-    },
-    "metadata": {
-      "$ref": "#/$defs/metadata"
+    "configurationV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "project",
+        "targets",
+        "resources"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "const": 2
+        },
+        "metadata": {
+          "$ref": "#/$defs/metadata"
+        },
+        "project": {
+          "$ref": "#/$defs/project"
+        },
+        "targets": {
+          "$ref": "#/$defs/versionTwoTargets"
+        },
+        "resources": {
+          "$ref": "#/$defs/versionTwoResources"
+        }
+      }
     },
     "project": {
       "type": "object",
@@ -32,10 +93,35 @@
         }
       }
     },
-    "targets": {
+    "nativeResources": {
       "type": "object",
-      "additionalProperties": false,
       "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/nativeResource"
+      }
+    },
+    "nativeResource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/appIcon"
+        },
+        {
+          "$ref": "#/$defs/notificationIcon"
+        },
+        {
+          "$ref": "#/$defs/splashScreen"
+        }
+      ]
+    },
+    "versionTwoTargets": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+      },
       "properties": {
         "android": {
           "$ref": "#/$defs/androidTarget"
@@ -43,9 +129,114 @@
         "ios": {
           "$ref": "#/$defs/iosTarget"
         }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/catalogTarget"
       }
     },
-    "resources": {
+    "catalogTarget": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/directoryTarget"
+        },
+        {
+          "$ref": "#/$defs/reactNativeLibraryTarget"
+        },
+        {
+          "$ref": "#/$defs/reactNativeAppTarget"
+        },
+        {
+          "$ref": "#/$defs/webAppTarget"
+        }
+      ]
+    },
+    "directoryTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root"
+      ],
+      "properties": {
+        "kind": {
+          "const": "directory"
+        },
+        "root": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "reactNativeLibraryTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root"
+      ],
+      "properties": {
+        "kind": {
+          "const": "react-native-library"
+        },
+        "root": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "reactNativeAppTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root"
+      ],
+      "properties": {
+        "kind": {
+          "const": "react-native-app"
+        },
+        "root": {
+          "$ref": "#/$defs/path"
+        },
+        "androidFontDirectory": {
+          "$ref": "#/$defs/path"
+        },
+        "iosFontDirectory": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "webAppTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "root",
+        "sourceDirectory",
+        "publicDirectory",
+        "publicBasePath"
+      ],
+      "properties": {
+        "kind": {
+          "const": "web-app"
+        },
+        "root": {
+          "$ref": "#/$defs/path"
+        },
+        "sourceDirectory": {
+          "$ref": "#/$defs/path"
+        },
+        "publicDirectory": {
+          "$ref": "#/$defs/path"
+        },
+        "publicBasePath": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "\\u0000"
+          }
+        }
+      }
+    },
+    "versionTwoResources": {
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
@@ -54,19 +245,775 @@
       "additionalProperties": {
         "oneOf": [
           {
-            "$ref": "#/$defs/appIcon"
+            "$ref": "#/$defs/nativeResource"
           },
           {
-            "$ref": "#/$defs/notificationIcon"
+            "$ref": "#/$defs/filesResource"
           },
           {
-            "$ref": "#/$defs/splashScreen"
+            "$ref": "#/$defs/svgComponentsResource"
+          },
+          {
+            "$ref": "#/$defs/imageVariantsResource"
+          },
+          {
+            "$ref": "#/$defs/webAppBrandingResource"
+          },
+          {
+            "$ref": "#/$defs/fontFamilyResource"
           }
         ]
       }
-    }
-  },
-  "$defs": {
+    },
+    "catalogSource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/path"
+        },
+        {
+          "$ref": "#/$defs/fileSource"
+        },
+        {
+          "$ref": "#/$defs/globSource"
+        },
+        {
+          "$ref": "#/$defs/packageSource"
+        }
+      ]
+    },
+    "fileSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file"
+      ],
+      "properties": {
+        "file": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "globSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "include"
+      ],
+      "properties": {
+        "root": {
+          "$ref": "#/$defs/path"
+        },
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/path"
+          }
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "packageSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package",
+        "path"
+      ],
+      "properties": {
+        "package": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?:@[a-z0-9._-]+/)?[a-z0-9._-]+$"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+    },
+    "filesResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "source",
+        "outputs"
+      ],
+      "properties": {
+        "type": {
+          "const": "files"
+        },
+        "source": {
+          "$ref": "#/$defs/catalogSource"
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/fileOutput"
+          }
+        }
+      }
+    },
+    "fileOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "directory"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/targetId"
+        },
+        "directory": {
+          "$ref": "#/$defs/path"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        }
+      }
+    },
+    "svgComponentsResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "source",
+        "outputs"
+      ],
+      "properties": {
+        "type": {
+          "const": "svg-components"
+        },
+        "source": {
+          "$ref": "#/$defs/catalogSource"
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/svgComponentOutput"
+          }
+        }
+      }
+    },
+    "svgComponentOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "directory",
+        "runtime",
+        "preset"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/targetId"
+        },
+        "directory": {
+          "$ref": "#/$defs/path"
+        },
+        "runtime": {
+          "enum": [
+            "react-dom",
+            "react-native"
+          ]
+        },
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "naming": {
+          "enum": [
+            "pascal-case",
+            "preserve"
+          ]
+        },
+        "componentNaming": {
+          "$ref": "#/$defs/svgComponentNamingPolicy"
+        },
+        "generateBarrel": {
+          "type": "boolean"
+        }
+      }
+    },
+    "svgComponentNamingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentDirectoryPrefix",
+        "separator"
+      ],
+      "properties": {
+        "parentDirectoryPrefix": {
+          "type": "string",
+          "minLength": 1
+        },
+        "separator": {
+          "type": "string"
+        }
+      }
+    },
+    "imageVariantsResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "source",
+        "outputs"
+      ],
+      "properties": {
+        "type": {
+          "const": "image-variants"
+        },
+        "source": {
+          "$ref": "#/$defs/catalogSource"
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/imageVariantOutput"
+          }
+        }
+      }
+    },
+    "imageVariantOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "path",
+        "width",
+        "height",
+        "format"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/targetId"
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "width": {
+          "$ref": "#/$defs/imageDimension"
+        },
+        "height": {
+          "$ref": "#/$defs/imageDimension"
+        },
+        "format": {
+          "enum": [
+            "png",
+            "webp",
+            "jpeg",
+            "ico"
+          ]
+        },
+        "fit": {
+          "$ref": "#/$defs/imageFit"
+        },
+        "background": {
+          "$ref": "#/$defs/color"
+        },
+        "quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "imageDimension": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16384
+    },
+    "imageFit": {
+      "enum": [
+        "contain",
+        "cover",
+        "fill",
+        "inside",
+        "outside"
+      ]
+    },
+    "webAppBrandingResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "preset",
+        "displayName",
+        "shortName",
+        "brandColor",
+        "iconBackgroundColor",
+        "sources",
+        "output",
+        "faviconSizes",
+        "applicationIconSizes",
+        "naming",
+        "manifest"
+      ],
+      "properties": {
+        "type": {
+          "const": "web-app-branding"
+        },
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shortName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "brandColor": {
+          "$ref": "#/$defs/color"
+        },
+        "iconBackgroundColor": {
+          "$ref": "#/$defs/color"
+        },
+        "sources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "foreground"
+          ],
+          "properties": {
+            "foreground": {
+              "$ref": "#/$defs/catalogSource"
+            },
+            "background": {
+              "$ref": "#/$defs/catalogSource"
+            },
+            "socialPreview": {
+              "$ref": "#/$defs/catalogSource"
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "target",
+            "directory"
+          ],
+          "properties": {
+            "target": {
+              "$ref": "#/$defs/targetId"
+            },
+            "directory": {
+              "$ref": "#/$defs/path"
+            },
+            "manifest": {
+              "$ref": "#/$defs/path"
+            },
+            "document": {
+              "$ref": "#/$defs/path"
+            }
+          }
+        },
+        "faviconSizes": {
+          "$ref": "#/$defs/imageSizes"
+        },
+        "faviconIcoSizes": {
+          "$ref": "#/$defs/imageSizes"
+        },
+        "appleTouchIconSize": {
+          "$ref": "#/$defs/imageDimension"
+        },
+        "applicationIconSizes": {
+          "$ref": "#/$defs/imageSizes"
+        },
+        "maskableIconSizes": {
+          "$ref": "#/$defs/imageSizes"
+        },
+        "foregroundScales": {
+          "$ref": "#/$defs/webBrandForegroundScales"
+        },
+        "naming": {
+          "$ref": "#/$defs/webBrandNaming"
+        },
+        "manifest": {
+          "$ref": "#/$defs/webBrandManifest"
+        },
+        "seo": {
+          "$ref": "#/$defs/webBrandSeo"
+        },
+        "staticWebApp": {
+          "$ref": "#/$defs/staticWebAppIntegration"
+        },
+        "socialPreview": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "$ref": "#/$defs/imageDimension"
+            },
+            "height": {
+              "$ref": "#/$defs/imageDimension"
+            },
+            "fit": {
+              "$ref": "#/$defs/imageFit"
+            },
+            "overlayPreset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "logoSize": {
+              "$ref": "#/$defs/imageDimension"
+            }
+          }
+        }
+      }
+    },
+    "scale": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "foregroundScalePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/scale"
+        },
+        "overrides": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/scale"
+          }
+        }
+      }
+    },
+    "webBrandForegroundScales": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "favicon": {
+          "$ref": "#/$defs/foregroundScalePolicy"
+        },
+        "appleTouch": {
+          "$ref": "#/$defs/scale"
+        },
+        "application": {
+          "$ref": "#/$defs/scale"
+        },
+        "maskable": {
+          "$ref": "#/$defs/scale"
+        }
+      }
+    },
+    "webBrandNaming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "content-hash",
+            "stable"
+          ]
+        },
+        "hashLength": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 64
+        },
+        "fallbackFavicon": {
+          "$ref": "#/$defs/path"
+        },
+        "fallbackManifest": {
+          "$ref": "#/$defs/path"
+        }
+      },
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "content-hash"
+          }
+        },
+        "required": [
+          "strategy"
+        ]
+      },
+      "then": {
+        "required": [
+          "hashLength"
+        ]
+      }
+    },
+    "webBrandManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backgroundColor",
+        "display"
+      ],
+      "properties": {
+        "themeColor": {
+          "$ref": "#/$defs/color"
+        },
+        "backgroundColor": {
+          "$ref": "#/$defs/color"
+        },
+        "display": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "webBrandSeo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "siteUrl": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonicalPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "robots": {
+          "type": "string",
+          "minLength": 1
+        },
+        "openGraph": {
+          "$ref": "#/$defs/openGraphMetadata"
+        },
+        "twitter": {
+          "$ref": "#/$defs/twitterMetadata"
+        },
+        "colorScheme": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includeIcons": {
+          "type": "boolean"
+        },
+        "includeManifest": {
+          "type": "boolean"
+        }
+      }
+    },
+    "openGraphMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includeImage": {
+          "type": "boolean"
+        }
+      }
+    },
+    "twitterMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card"
+      ],
+      "properties": {
+        "card": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "includeImage": {
+          "type": "boolean"
+        }
+      }
+    },
+    "staticWebAppIntegration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "integrateCacheHeaders"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "integrateCacheHeaders": {
+          "type": "boolean"
+        }
+      }
+    },
+    "imageSizes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/imageDimension"
+      }
+    },
+    "fontFamilyResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "family",
+        "faces",
+        "outputs"
+      ],
+      "properties": {
+        "type": {
+          "const": "font-family"
+        },
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "faces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/fontFace"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/fontOutput"
+          }
+        }
+      }
+    },
+    "fontFace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "alias",
+        "weight",
+        "style"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/catalogSource"
+        },
+        "alias": {
+          "type": "string",
+          "minLength": 1
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "style": {
+          "enum": [
+            "normal",
+            "italic",
+            "oblique"
+          ]
+        },
+        "format": {
+          "enum": [
+            "ttf",
+            "otf",
+            "woff",
+            "woff2"
+          ]
+        }
+      }
+    },
+    "fontOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target"
+      ],
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/targetId"
+        },
+        "directory": {
+          "$ref": "#/$defs/path"
+        },
+        "stylesheet": {
+          "$ref": "#/$defs/path"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "directory"
+          ]
+        },
+        {
+          "required": [
+            "stylesheet"
+          ]
+        }
+      ]
+    },
     "metadata": {
       "type": "object",
       "additionalProperties": false,

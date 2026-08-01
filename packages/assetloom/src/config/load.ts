@@ -3,8 +3,9 @@ import path from 'node:path';
 import { Ajv2020, type ErrorObject } from 'ajv/dist/2020.js';
 import { LoomError } from '../domain/errors.js';
 import type {
-  AssetloomConfiguration,
   LoadedConfiguration,
+  LoadedVersionedConfiguration,
+  VersionedAssetloomConfiguration,
 } from '../domain/types.js';
 import { mergeConfigurations } from './merge.js';
 
@@ -123,10 +124,10 @@ function validateSemanticRules(
   }
 }
 
-export async function loadConfiguration(
+export async function loadVersionedConfiguration(
   configuredFiles: readonly string[],
   options: LoadConfigurationOptions = {},
-): Promise<LoadedConfiguration> {
+): Promise<LoadedVersionedConfiguration> {
   const cwd = path.resolve(options.cwd ?? process.cwd());
   const files = configuredFiles.map((file) => path.resolve(cwd, file));
   const values = await Promise.all(
@@ -165,7 +166,9 @@ export async function loadConfiguration(
     });
   }
 
-  const config = merged.value as unknown as AssetloomConfiguration;
+  // AJV is the runtime type boundary. Both schema variants are closed and
+  // version-discriminated before the parsed value is exposed to callers.
+  const config = merged.value as unknown as VersionedAssetloomConfiguration;
   const projectRoot = path.resolve(cwd, config.project.root);
   return {
     config,
@@ -173,4 +176,23 @@ export async function loadConfiguration(
     projectRoot,
     provenance: merged.provenance,
   };
+}
+
+export async function loadConfiguration(
+  configuredFiles: readonly string[],
+  options: LoadConfigurationOptions = {},
+): Promise<LoadedConfiguration> {
+  const loaded = await loadVersionedConfiguration(configuredFiles, options);
+  if (loaded.config.schemaVersion !== 1) {
+    throw new LoomError({
+      code: 'LOOM_CFG_VALIDATE',
+      message: 'Schema version 2 requires the catalog planning API.',
+      context: {
+        file: loaded.files.at(-1),
+        jsonPointer: '/schemaVersion',
+        reason: 'Use loadVersionedConfiguration for schema version 2.',
+      },
+    });
+  }
+  return { ...loaded, config: loaded.config };
 }

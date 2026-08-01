@@ -1,3 +1,10 @@
+import type {
+  CatalogResourceDefinition,
+} from './catalog/resources.js';
+import type {
+  CatalogTargetConfiguration,
+} from './catalog/targets.js';
+
 export type TargetPlatform = 'android' | 'ios';
 
 export type GenerationOperation =
@@ -96,7 +103,7 @@ export type ResourceConfiguration =
   | NotificationIconResource
   | SplashScreenResource;
 
-export interface AssetloomConfiguration {
+export interface AssetloomConfigurationV1 {
   $schema?: string;
   schemaVersion: 1;
   metadata?: ConfigurationMetadata;
@@ -110,6 +117,37 @@ export interface AssetloomConfiguration {
   resources: Record<string, ResourceConfiguration>;
 }
 
+export interface AssetloomV2Targets {
+  readonly [targetId: string]:
+    | AndroidTargetConfiguration
+    | IosTargetConfiguration
+    | CatalogTargetConfiguration
+    | undefined;
+  readonly android?: AndroidTargetConfiguration;
+  readonly ios?: IosTargetConfiguration;
+}
+
+export interface AssetloomConfigurationV2 {
+  readonly $schema?: string;
+  readonly schemaVersion: 2;
+  readonly metadata?: ConfigurationMetadata;
+  readonly project: {
+    readonly root: string;
+  };
+  readonly targets: AssetloomV2Targets;
+  readonly resources: Record<
+    string,
+    ResourceConfiguration | CatalogResourceDefinition
+  >;
+}
+
+/** The version 1 alias remains the compatibility contract for the native API. */
+export type AssetloomConfiguration = AssetloomConfigurationV1;
+
+export type VersionedAssetloomConfiguration =
+  | AssetloomConfigurationV1
+  | AssetloomConfigurationV2;
+
 export interface ProvenanceEntry {
   readonly file: string;
   readonly configurationIndex: number;
@@ -117,8 +155,10 @@ export interface ProvenanceEntry {
 
 export type ConfigurationProvenance = ReadonlyMap<string, ProvenanceEntry>;
 
-export interface LoadedConfiguration {
-  readonly config: AssetloomConfiguration;
+export interface LoadedConfiguration<
+  TConfiguration extends VersionedAssetloomConfiguration = AssetloomConfigurationV1,
+> {
+  readonly config: TConfiguration;
   readonly files: readonly string[];
   readonly projectRoot: string;
   readonly provenance: ConfigurationProvenance;
@@ -142,6 +182,9 @@ export interface VerificationResult {
   readonly checked: readonly string[];
   readonly skippedNativeChecks: readonly string[];
 }
+
+export type LoadedVersionedConfiguration =
+  LoadedConfiguration<VersionedAssetloomConfiguration>;
 
 export type ReportFileStatus =
   | 'valid'

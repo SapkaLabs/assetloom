@@ -1,6 +1,7 @@
 import { stat, readFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { LoomError } from '../domain/errors.js';
+import { compareCodePoints } from '../domain/ordering.js';
 import { AtomicWriter } from './atomic-writer.js';
 
 const BEGIN = '# >>> assetloom generated resources >>>';
@@ -113,7 +114,10 @@ export class GitIgnoreManager {
         }
       }
       await mkdir(path.dirname(excludeFile), { recursive: true });
-      const next = replaceManagedBlock(content, [...patterns].sort());
+      const next = replaceManagedBlock(
+        content,
+        [...patterns].sort(compareCodePoints),
+      );
       const writer = new AtomicWriter(repositoryRoot);
       await writer.writeIfChanged(excludeFile, Buffer.from(next));
       const published = await readFile(excludeFile, 'utf8');

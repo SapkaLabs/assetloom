@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { clean, generate } from '../src/api/generate.js';
 import { loadConfiguration } from '../src/config/load.js';
 import { verify } from '../src/verification/index.js';
+import { ManifestStore } from '../src/storage/manifest.js';
 
 const iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
   <rect width="108" height="108" fill="#172033"/>
@@ -93,6 +94,23 @@ describe('generation lifecycle', () => {
     const { directory, loaded } = await fixture();
     const first = await generate(loaded);
     expect(first.written.length).toBeGreaterThan(20);
+    const nativeManifest = await new ManifestStore(
+      directory,
+      path.join(directory, '.assetloom'),
+    ).load();
+    expect(Object.keys(nativeManifest.files).sort()).toEqual(
+      first.plan.tasks
+        .filter((task) => task.operation !== 'update-project')
+        .map((task) =>
+          path.relative(directory, task.destination).split(path.sep).join('/'),
+        )
+        .sort(),
+    );
+    expect(
+      new Set(
+        Object.values(nativeManifest.files).map((entry) => entry.target),
+      ),
+    ).toEqual(new Set(['android']));
 
     const second = await generate(loaded);
     expect(second.written).toEqual([]);

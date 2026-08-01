@@ -1,18 +1,26 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LoomError } from '../domain/errors.js';
-import type { TargetPlatform } from '../domain/types.js';
+import { compareCodePoints } from '../domain/ordering.js';
 import { AtomicWriter } from './atomic-writer.js';
+import type { ProjectStatePathGuard } from './state-path-guard.js';
+
+const TARGET_ID_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*$/;
 
 export interface ManifestFile {
   readonly sha256: string;
   readonly taskId: string;
-  readonly target: TargetPlatform;
+  readonly target: string;
 }
 
 export interface AssetloomManifest {
   readonly version: 1;
   readonly files: Readonly<Record<string, ManifestFile>>;
+}
+
+export interface ManifestStoreOptions {
+  readonly fileOrdering?: 'code-point' | 'preserve';
+  readonly statePaths?: ProjectStatePathGuard;
 }
 
 export function emptyManifest(): AssetloomManifest {
@@ -28,8 +36,23 @@ function isManifestFile(value: unknown): value is ManifestFile {
     /^[0-9a-f]{64}$/.test(value.sha256) &&
     'taskId' in value &&
     typeof value.taskId === 'string' &&
+    value.taskId.length > 0 &&
     'target' in value &&
-    (value.target === 'android' || value.target === 'ios')
+    typeof value.target === 'string' &&
+    TARGET_ID_PATTERN.test(value.target)
+  );
+}
+
+function isPortableManifestPath(value: string): boolean {
+  return (
+    value !== '' &&
+    !value.includes('\\') &&
+    !value.startsWith('/') &&
+    !value.endsWith('/') &&
+    !path.isAbsolute(value) &&
+    !path.posix.isAbsolute(value) &&
+    path.posix.normalize(value) === value &&
+    value.split('/').every((segment) => segment !== '.' && segment !== '..')
   );
 }
 
@@ -48,19 +71,25 @@ function validateManifest(value: unknown): value is AssetloomManifest {
   }
   return Object.entries(value.files).every(
     ([relativePath, entry]) =>
-      relativePath !== '' &&
-      !path.isAbsolute(relativePath) &&
-      !relativePath.split('/').includes('..') &&
+      isPortableManifestPath(relativePath) &&
       isManifestFile(entry),
   );
 }
 
 export class ManifestStore {
+  readonly #fileOrdering: 'code-point' | 'preserve';
   readonly #filename: string;
+  readonly #statePaths: ProjectStatePathGuard | undefined;
   readonly #writer: AtomicWriter;
 
-  constructor(projectRoot: string, stateDirectory: string) {
+  constructor(
+    projectRoot: string,
+    stateDirectory: string,
+    options: ManifestStoreOptions = {},
+  ) {
+    this.#fileOrdering = options.fileOrdering ?? 'preserve';
     this.#filename = path.join(stateDirectory, 'manifest.json');
+    this.#statePaths = options.statePaths;
     this.#writer = new AtomicWriter(projectRoot);
   }
 
@@ -69,6 +98,7 @@ export class ManifestStore {
   }
 
   async load(): Promise<AssetloomManifest> {
+    await this.#statePaths?.assertSafe(this.#filename);
     try {
       const parsed: unknown = JSON.parse(await readFile(this.#filename, 'utf8'));
       if (!validateManifest(parsed)) {
@@ -100,8 +130,20 @@ export class ManifestStore {
   }
 
   async save(manifest: AssetloomManifest): Promise<void> {
+    await this.#statePaths?.assertSafe(this.#filename);
     try {
-      const content = Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`);
+      const document =
+        this.#fileOrdering === 'code-point'
+          ? {
+              version: 1 as const,
+              files: Object.fromEntries(
+                Object.entries(manifest.files).sort(([left], [right]) =>
+                  compareCodePoints(left, right),
+                ),
+              ),
+            }
+          : manifest;
+      const content = Buffer.from(`${JSON.stringify(document, null, 2)}\n`);
       await this.#writer.writeIfChanged(this.#filename, content);
     } catch (cause) {
       if (

@@ -1,10 +1,24 @@
 import path from 'node:path';
 import { Command, CommanderError, Option } from 'commander';
 import { clean, generate } from '../api/generate.js';
+import { cleanV2 } from '../api/clean-v2.js';
+import { generateV2 } from '../api/generate-v2.js';
+import { createCatalogReport } from '../api/report-v2.js';
 import { createHtmlReport } from '../api/report.js';
-import { loadConfiguration } from '../config/load.js';
+import { verifyV2 } from '../api/verify-v2.js';
+import { loadVersionedConfiguration } from '../config/load.js';
 import { asLoomError, LoomError } from '../domain/errors.js';
-import type { TargetPlatform } from '../domain/types.js';
+import type {
+  GenerationTask,
+  LoadedConfiguration,
+  LoadedVersionedConfiguration,
+  TargetPlatform,
+} from '../domain/types.js';
+import { createDefaultCatalogRuntime } from '../infrastructure/composition/default-catalog-runtime.js';
+import {
+  createCompositeGenerationPlan,
+  type CompositePlannedArtifact,
+} from '../application/planning/composite-planner.js';
 import { createGenerationPlan, parseTarget } from '../planner/index.js';
 import { verify } from '../verification/index.js';
 import { printError, printResult } from './output.js';
@@ -42,7 +56,7 @@ function addCommonOptions(command: Command): Command {
     .addOption(
       new Option(
         '--target <target>',
-        'generate only android or ios resources',
+        'process only one named target (schema v1: android or ios)',
       ),
     );
 }
@@ -51,18 +65,44 @@ function targetOption(value?: string): TargetPlatform | undefined {
   return value === undefined ? undefined : parseTarget(value);
 }
 
-function relativePlan(
+function legacyLoaded(
+  loaded: LoadedVersionedConfiguration,
+): LoadedConfiguration {
+  if (loaded.config.schemaVersion !== 1) {
+    throw new LoomError({
+      code: 'LOOM_INTERNAL',
+      message: 'A schema-v2 configuration reached the legacy command path.',
+    });
+  }
+  return { ...loaded, config: loaded.config };
+}
+
+function portableRelative(projectRoot: string, destination: string): string {
+  return path.relative(projectRoot, destination).split(path.sep).join('/');
+}
+
+function relativeNativePlan(
   projectRoot: string,
-  tasks: Awaited<ReturnType<typeof createGenerationPlan>>['tasks'],
+  tasks: readonly GenerationTask[],
 ) {
   return tasks.map((task) => ({
     ...task,
-    destination: path
-      .relative(projectRoot, task.destination)
-      .split(path.sep)
-      .join('/'),
+    destination: portableRelative(projectRoot, task.destination),
     sourceDependencies: task.sourceDependencies.map((source) =>
-      path.relative(projectRoot, source).split(path.sep).join('/'),
+      portableRelative(projectRoot, source),
+    ),
+  }));
+}
+
+function relativeCompositePlan(
+  projectRoot: string,
+  artifacts: readonly CompositePlannedArtifact[],
+) {
+  return artifacts.map((artifact) => ({
+    ...artifact,
+    destination: portableRelative(projectRoot, artifact.destination),
+    sourceDependencies: artifact.sourceDependencies.map((source) =>
+      portableRelative(projectRoot, source),
     ),
   }));
 }
@@ -82,9 +122,9 @@ export function createProgram(): Command {
   const program = new Command()
     .name('assetloom')
     .description(
-      'Generate deterministic native Android and iOS application resources.',
+      'Generate deterministic native and configurable application resources.',
     )
-    .version('0.1.0')
+    .version('0.2.0')
     .option('--json', 'emit machine-readable JSON')
     .option('--verbose', 'include diagnostic stack traces')
     .showHelpAfterError()
@@ -93,26 +133,52 @@ export function createProgram(): Command {
   addCommonOptions(
     program.command('plan').description('print the deterministic generation plan'),
   ).action(async (options: CommonCommandOptions, command: Command) => {
-    const loaded = await loadConfiguration(options.config);
-    const plan = await createGenerationPlan(
+    const loaded = await loadVersionedConfiguration(options.config);
+    if (loaded.config.schemaVersion === 1) {
+      const nativeLoaded = legacyLoaded(loaded);
+      const plan = await createGenerationPlan(
+        nativeLoaded,
+        targetOption(options.target),
+      );
+      const tasks = relativeNativePlan(nativeLoaded.projectRoot, plan.tasks);
+      printResult(
+        { ok: true, plan: { targets: plan.targets, tasks } },
+        rootOptions(command),
+        tasks
+          .map(
+            (task) =>
+              `${task.operation.padEnd(14)} ${task.target.padEnd(7)} ${task.destination}`,
+          )
+          .join('\n'),
+      );
+      return;
+    }
+
+    const runtime = createDefaultCatalogRuntime(loaded);
+    const plan = await createCompositeGenerationPlan(
       loaded,
-      targetOption(options.target),
+      runtime.resourceHandlers,
+      runtime.planningContext,
+      options.target,
     );
-    const tasks = relativePlan(loaded.projectRoot, plan.tasks);
+    const artifacts = relativeCompositePlan(
+      loaded.projectRoot,
+      plan.artifacts,
+    );
     printResult(
-      { ok: true, plan: { targets: plan.targets, tasks } },
+      { ok: true, plan: { targets: plan.targets, artifacts } },
       rootOptions(command),
-      tasks
+      artifacts
         .map(
-          (task) =>
-            `${task.operation.padEnd(14)} ${task.target.padEnd(7)} ${task.destination}`,
+          (artifact) =>
+            `${artifact.operation.padEnd(18)} ${artifact.target.padEnd(12)} ${artifact.destination}`,
         )
         .join('\n'),
     );
   });
 
   addCommonOptions(
-    program.command('generate').description('generate and publish native resources'),
+    program.command('generate').description('generate and publish resources'),
   )
     .option('--report', 'also create a self-contained HTML asset report')
     .option(
@@ -120,15 +186,66 @@ export function createProgram(): Command {
       'report path relative to the project root; implies --report',
     )
     .action(async (options: GenerateCommandOptions, command: Command) => {
-      const loaded = await loadConfiguration(options.config);
-      const target = targetOption(options.target);
-      const result = await generate(loaded, {
-        ...(target === undefined ? {} : { target }),
+      const loaded = await loadVersionedConfiguration(options.config);
+      if (loaded.config.schemaVersion === 1) {
+        const nativeLoaded = legacyLoaded(loaded);
+        const target = targetOption(options.target);
+        const result = await generate(nativeLoaded, {
+          ...(target === undefined ? {} : { target }),
+        });
+        const report =
+          options.report === true || options.reportOutput !== undefined
+            ? await createHtmlReport(nativeLoaded, {
+                ...(target === undefined ? {} : { target }),
+                ...(options.reportOutput === undefined
+                  ? {}
+                  : { output: options.reportOutput }),
+              })
+            : undefined;
+        const humanReport =
+          report === undefined
+            ? ''
+            : `\nReport: ${portableRelative(nativeLoaded.projectRoot, report.path)} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
+        printResult(
+          {
+            ok: true,
+            result: {
+              targets: result.plan.targets,
+              written: result.written.map((item) =>
+                portableRelative(nativeLoaded.projectRoot, item),
+              ),
+              unchanged: result.unchanged.map((item) =>
+                portableRelative(nativeLoaded.projectRoot, item),
+              ),
+              removed: result.removed.map((item) =>
+                portableRelative(nativeLoaded.projectRoot, item),
+              ),
+              ...(report === undefined
+                ? {}
+                : {
+                    report: {
+                      ...report,
+                      path: portableRelative(nativeLoaded.projectRoot, report.path),
+                    },
+                  }),
+            },
+          },
+          rootOptions(command),
+          `Generated ${result.written.length} changed file(s); ${result.unchanged.length} unchanged; ${result.removed.length} stale file(s) removed.${humanReport}`,
+        );
+        return;
+      }
+
+      const runtime = createDefaultCatalogRuntime(loaded);
+      const result = await generateV2(loaded, {
+        ...runtime,
+        ...(options.target === undefined ? {} : { target: options.target }),
       });
       const report =
         options.report === true || options.reportOutput !== undefined
-          ? await createHtmlReport(loaded, {
-              ...(target === undefined ? {} : { target }),
+          ? await createCatalogReport(loaded, {
+              ...runtime,
+              ...(options.target === undefined ? {} : { target: options.target }),
               ...(options.reportOutput === undefined
                 ? {}
                 : { output: options.reportOutput }),
@@ -137,30 +254,27 @@ export function createProgram(): Command {
       const humanReport =
         report === undefined
           ? ''
-          : `\nReport: ${path.relative(loaded.projectRoot, report.path).split(path.sep).join('/')} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
+          : `\nReport: ${portableRelative(loaded.projectRoot, report.path)} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
       printResult(
         {
           ok: true,
           result: {
             targets: result.plan.targets,
             written: result.written.map((item) =>
-              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+              portableRelative(loaded.projectRoot, item),
             ),
             unchanged: result.unchanged.map((item) =>
-              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+              portableRelative(loaded.projectRoot, item),
             ),
             removed: result.removed.map((item) =>
-              path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
+              portableRelative(loaded.projectRoot, item),
             ),
             ...(report === undefined
               ? {}
               : {
                   report: {
                     ...report,
-                    path: path
-                      .relative(loaded.projectRoot, report.path)
-                      .split(path.sep)
-                      .join('/'),
+                    path: portableRelative(loaded.projectRoot, report.path),
                   },
                 }),
           },
@@ -175,40 +289,64 @@ export function createProgram(): Command {
       .command('report')
       .description('create a self-contained HTML review of generated assets'),
   )
-    .option(
-      '-o, --output <file>',
-      'report path relative to the project root',
-    )
+    .option('-o, --output <file>', 'report path relative to the project root')
     .action(async (options: ReportCommandOptions, command: Command) => {
-      const loaded = await loadConfiguration(options.config);
-      const target = targetOption(options.target);
-      const result = await createHtmlReport(loaded, {
-        ...(target === undefined ? {} : { target }),
+      const loaded = await loadVersionedConfiguration(options.config);
+      if (loaded.config.schemaVersion === 1) {
+        const nativeLoaded = legacyLoaded(loaded);
+        const target = targetOption(options.target);
+        const result = await createHtmlReport(nativeLoaded, {
+          ...(target === undefined ? {} : { target }),
+          ...(options.output === undefined ? {} : { output: options.output }),
+        });
+        const reportPath = portableRelative(nativeLoaded.projectRoot, result.path);
+        printResult(
+          { ok: true, result: { ...result, path: reportPath } },
+          rootOptions(command),
+          `Created ${reportPath} for "${result.configurationName}": ${result.outputs} output(s), ${result.sources} source(s), ${result.issues} issue(s).`,
+        );
+        return;
+      }
+
+      const runtime = createDefaultCatalogRuntime(loaded);
+      const result = await createCatalogReport(loaded, {
+        ...runtime,
+        ...(options.target === undefined ? {} : { target: options.target }),
         ...(options.output === undefined ? {} : { output: options.output }),
       });
-      const reportPath = path
-        .relative(loaded.projectRoot, result.path)
-        .split(path.sep)
-        .join('/');
+      const reportPath = portableRelative(loaded.projectRoot, result.path);
       printResult(
-        {
-          ok: true,
-          result: { ...result, path: reportPath },
-        },
+        { ok: true, result: { ...result, path: reportPath } },
         rootOptions(command),
-        `Created ${reportPath} for "${result.configurationName}": ${result.outputs} output(s), ${result.sources} source(s), ${result.issues} issue(s).`,
+        `Created ${reportPath}: ${result.outputs} output(s), ${result.issues} issue(s).`,
       );
     });
 
   addCommonOptions(
-    program.command('verify').description('verify generated native resources'),
+    program.command('verify').description('verify generated resources'),
   )
     .option('--native', 'also compile resources with native platform tools')
     .action(async (options: VerifyCommandOptions, command: Command) => {
-      const loaded = await loadConfiguration(options.config);
-      const target = targetOption(options.target);
-      const result = await verify(loaded, {
-        ...(target === undefined ? {} : { target }),
+      const loaded = await loadVersionedConfiguration(options.config);
+      if (loaded.config.schemaVersion === 1) {
+        const nativeLoaded = legacyLoaded(loaded);
+        const target = targetOption(options.target);
+        const result = await verify(nativeLoaded, {
+          ...(target === undefined ? {} : { target }),
+          ...(options.native === true ? { native: true } : {}),
+        });
+        printResult(
+          { ok: true, result },
+          rootOptions(command),
+          `Verified ${result.checked.length} generated file(s).`,
+        );
+        return;
+      }
+
+      const runtime = createDefaultCatalogRuntime(loaded);
+      const result = await verifyV2(loaded, {
+        ...runtime,
+        ...(options.target === undefined ? {} : { target: options.target }),
         ...(options.native === true ? { native: true } : {}),
       });
       printResult(
@@ -221,19 +359,46 @@ export function createProgram(): Command {
   addCommonOptions(
     program.command('clean').description('remove only Assetloom-owned outputs'),
   ).action(async (options: CommonCommandOptions, command: Command) => {
-    const loaded = await loadConfiguration(options.config);
-    const removed = await clean(loaded, targetOption(options.target));
+    const loaded = await loadVersionedConfiguration(options.config);
+    if (loaded.config.schemaVersion === 1) {
+      const nativeLoaded = legacyLoaded(loaded);
+      const removed = await clean(nativeLoaded, targetOption(options.target));
+      printResult(
+        {
+          ok: true,
+          result: {
+            removed: removed.map((item) =>
+              portableRelative(nativeLoaded.projectRoot, item),
+            ),
+          },
+        },
+        rootOptions(command),
+        `Removed ${removed.length} Assetloom-owned file(s).`,
+      );
+      return;
+    }
+
+    const runtime = createDefaultCatalogRuntime(loaded);
+    const result = await cleanV2(loaded, {
+      integrationAdapters: runtime.integrationAdapters,
+      ...(options.target === undefined ? {} : { target: options.target }),
+    });
+    const removed = result.removed.map((item) =>
+      portableRelative(loaded.projectRoot, item),
+    );
+    const updatedIntegrations = result.updatedIntegrations.map((item) =>
+      portableRelative(loaded.projectRoot, item),
+    );
+    const unchangedIntegrations = result.unchangedIntegrations.map((item) =>
+      portableRelative(loaded.projectRoot, item),
+    );
     printResult(
       {
         ok: true,
-        result: {
-          removed: removed.map((item) =>
-            path.relative(loaded.projectRoot, item).split(path.sep).join('/'),
-          ),
-        },
+        result: { removed, updatedIntegrations, unchangedIntegrations },
       },
       rootOptions(command),
-      `Removed ${removed.length} Assetloom-owned file(s).`,
+      `Removed ${removed.length} Assetloom-owned file(s); updated ${updatedIntegrations.length} integration file(s).`,
     );
   });
 
