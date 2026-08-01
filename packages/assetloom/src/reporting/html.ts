@@ -267,7 +267,7 @@ export function renderOutputSection(outputs: readonly ReportOutput[]): string {
     <div class="subsection">
       <div class="subsection-heading">
         <div>
-          <p class="eyebrow">Published native files</p>
+          <p class="eyebrow">Published files</p>
           <h3>Generated outputs</h3>
         </div>
         <span class="count ${issues > 0 ? 'count-danger' : ''}">${outputs.length}${issues > 0 ? ` · ${issues} issue${issues === 1 ? '' : 's'}` : ''}</span>

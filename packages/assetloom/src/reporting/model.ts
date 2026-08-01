@@ -1,9 +1,3 @@
-import type {
-  GenerationOperation,
-  ResourceConfiguration,
-  TargetPlatform,
-} from '../domain/types.js';
-
 export type ReportAssetStatus =
   | 'valid'
   | 'modified'
@@ -30,8 +24,8 @@ export interface ReportOutput {
   readonly taskId: string;
   readonly label: string;
   readonly path: string;
-  readonly target: TargetPlatform;
-  readonly operation: GenerationOperation;
+  readonly target: string;
+  readonly operation: string;
   readonly format?: string;
   readonly expectedFormat?: string;
   readonly width?: number;
@@ -50,9 +44,9 @@ export interface ReportOutput {
 export interface ReportResource {
   readonly id: string;
   readonly title: string;
-  readonly type: ResourceConfiguration['type'];
-  readonly targets: readonly TargetPlatform[];
-  readonly config: ResourceConfiguration;
+  readonly type: string;
+  readonly targets: readonly string[];
+  readonly config: unknown;
   readonly sources: readonly ReportSource[];
   readonly outputs: readonly ReportOutput[];
   readonly issues: number;
@@ -68,7 +62,7 @@ export interface ReportModel {
   readonly description?: string;
   readonly fingerprint: string;
   readonly configurationFiles: readonly string[];
-  readonly targets: readonly TargetPlatform[];
+  readonly targets: readonly string[];
   readonly resources: readonly ReportResource[];
   readonly integration: ReportIntegration;
   readonly effectiveConfiguration: string;

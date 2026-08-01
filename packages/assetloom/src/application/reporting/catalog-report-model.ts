@@ -1,4 +1,5 @@
 import { compareCodePoints } from '../../domain/ordering.js';
+import type { ReportMedia } from '../../reporting/model.js';
 
 export type CatalogReportStatus =
   | 'valid'
@@ -11,15 +12,20 @@ export interface CatalogReportArtifact {
   readonly bytes?: number;
   readonly destination: string;
   readonly expectedSha256?: string;
+  readonly format?: string;
+  readonly hasAlpha?: boolean;
+  readonly height?: number;
   readonly id: string;
   readonly operation: string;
   readonly ownership: 'generated' | 'project-integration';
+  readonly media?: ReportMedia;
   readonly publicPath?: string;
   readonly resourceId: string;
   readonly resourceType: string;
   readonly sourceDependencies: readonly string[];
   readonly status: CatalogReportStatus;
   readonly target: string;
+  readonly width?: number;
 }
 
 export interface CatalogReportResource {

@@ -197,9 +197,14 @@ describe('versioned CLI composition', () => {
       outputs: 1,
       issues: 0,
     });
-    expect(
-      await readFile(path.join(directory, '.assetloom/catalog.html'), 'utf8'),
-    ).toContain('CLI catalog fixture');
+    const reportHtml = await readFile(
+      path.join(directory, '.assetloom/catalog.html'),
+      'utf8',
+    );
+    expect(reportHtml).toContain('CLI catalog fixture');
+    expect(reportHtml).toContain('Generated file browser');
+    expect(reportHtml).toContain('role="tree"');
+    expect(reportHtml).toContain('Preview &amp; details');
 
     const cleaned = await jsonCommand([
       'clean',

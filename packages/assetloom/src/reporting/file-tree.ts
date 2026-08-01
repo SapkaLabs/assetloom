@@ -140,7 +140,7 @@ function outputDetails(output: ReportOutput): string {
       'Ownership',
       output.managed
         ? 'Assetloom managed'
-        : 'Native project integration',
+        : 'Project integration',
     ),
   ].join('');
 }
@@ -185,7 +185,7 @@ export function renderGeneratedFileTree(
     <section class="file-browser-section" id="generated-files">
       <div class="resource-heading">
         <div>
-          <p class="eyebrow">Complete native inventory</p>
+          <p class="eyebrow">Complete generated inventory</p>
           <h2>Generated file browser</h2>
           <p class="file-browser-description">The visual sections above use one representative output per appearance. This tree contains every generated resolution and integration file. Select any file to inspect its embedded content and technical metadata.</p>
         </div>
@@ -194,7 +194,7 @@ export function renderGeneratedFileTree(
       <div class="file-browser">
         <div class="file-tree-pane">
           <div class="file-pane-heading">
-            <span><strong>Generated files</strong><small>Browse the native output tree</small></span>
+            <span><strong>Generated files</strong><small>Browse the complete output tree</small></span>
             <span class="file-pane-count">${outputs.length}</span>
           </div>
           <div class="file-tree" role="tree" aria-label="Generated files">

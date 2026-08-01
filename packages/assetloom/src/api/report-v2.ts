@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CatalogExecutor } from '../application/execution/catalog-executor.js';
 import type { CatalogMaterializerRegistry } from '../application/execution/catalog-materializer-registry.js';
@@ -10,11 +9,19 @@ import type { ResourceHandlerRegistry } from '../application/planning/resource-h
 import {
   createCatalogReportModel,
   type CatalogReportArtifact,
+  type CatalogReportModel,
   type CatalogReportStatus,
 } from '../application/reporting/catalog-report-model.js';
-import { renderCatalogReport } from '../application/reporting/catalog-report-document.js';
 import type { IntegrateProjectArtifact } from '../domain/catalog/planning.js';
 import type { LoadedVersionedConfiguration } from '../domain/types.js';
+import { renderReportDocument } from '../reporting/document.js';
+import { humanize } from '../reporting/html.js';
+import type {
+  ReportModel,
+  ReportOutput,
+  ReportResource,
+  ReportSource,
+} from '../reporting/model.js';
 import { AtomicWriter } from '../storage/atomic-writer.js';
 import { ContentCache } from '../storage/cache.js';
 import { FileSystemCatalogPublicationResolver } from '../storage/catalog-publication-resolver.js';
@@ -25,6 +32,11 @@ import { ManifestStore } from '../storage/manifest.js';
 import { FileSystemProjectFileGateway } from '../storage/project-file-gateway.js';
 import { ProjectStatePathGuard } from '../storage/state-path-guard.js';
 import { PendingGenerationStore } from '../storage/pending-generation-store.js';
+import {
+  inspectReportFile,
+  type InspectedReportFile,
+  reportRelativePath,
+} from './report.js';
 
 export interface CreateCatalogReportOptions {
   readonly integrationAdapters: ProjectIntegrationAdapterRegistry;
@@ -73,25 +85,11 @@ export function defaultCatalogReportOutputPath(
   );
 }
 
-interface InspectedFile {
-  readonly bytes: number;
-  readonly sha256: string;
-}
-
-async function inspectFile(destination: string): Promise<InspectedFile | undefined> {
-  try {
-    const content = await readFile(destination);
-    return { bytes: content.byteLength, sha256: sha256(content) };
-  } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error
-        ? error.code
-        : undefined;
-    if (code === 'ENOENT' || code === 'EISDIR') {
-      return undefined;
-    }
-    throw error;
-  }
+async function inspectFile(
+  destination: string,
+): Promise<InspectedReportFile | undefined> {
+  const inspected = await inspectReportFile(destination);
+  return inspected.exists ? inspected : undefined;
 }
 
 function relative(projectRoot: string, destination: string): string {
@@ -99,7 +97,7 @@ function relative(projectRoot: string, destination: string): string {
 }
 
 function status(
-  actual: InspectedFile | undefined,
+  actual: InspectedReportFile | undefined,
   manifestSha256: string | undefined,
   expectedSha256?: string,
 ): CatalogReportStatus {
@@ -115,6 +113,23 @@ function status(
     : 'modified';
 }
 
+function inspectedArtifact(
+  actual: InspectedReportFile | undefined,
+): Partial<CatalogReportArtifact> {
+  if (actual === undefined) {
+    return {};
+  }
+  return {
+    ...(actual.bytes === undefined ? {} : { bytes: actual.bytes }),
+    ...(actual.sha256 === undefined ? {} : { actualSha256: actual.sha256 }),
+    ...(actual.format === undefined ? {} : { format: actual.format }),
+    ...(actual.width === undefined ? {} : { width: actual.width }),
+    ...(actual.height === undefined ? {} : { height: actual.height }),
+    ...(actual.hasAlpha === undefined ? {} : { hasAlpha: actual.hasAlpha }),
+    ...(actual.media === undefined ? {} : { media: actual.media }),
+  };
+}
+
 function hasReceipt(
   artifact: IntegrateProjectArtifact,
   projectRoot: string,
@@ -128,6 +143,141 @@ function hasReceipt(
       receipt.stateKey === artifact.integration.stateKey &&
       receipt.target === artifact.target,
   );
+}
+
+function outputFromArtifact(
+  projectRoot: string,
+  artifact: CatalogReportArtifact,
+): ReportOutput {
+  return {
+    taskId: artifact.id,
+    label: `${humanize(artifact.operation)} · ${path.basename(artifact.destination)}`,
+    path: reportRelativePath(projectRoot, artifact.destination),
+    target: artifact.target,
+    operation: artifact.operation,
+    ...(artifact.format === undefined ? {} : { format: artifact.format }),
+    ...(artifact.width === undefined ? {} : { width: artifact.width }),
+    ...(artifact.height === undefined ? {} : { height: artifact.height }),
+    ...(artifact.hasAlpha === undefined
+      ? {}
+      : { hasAlpha: artifact.hasAlpha }),
+    ...(artifact.bytes === undefined ? {} : { bytes: artifact.bytes }),
+    ...(artifact.expectedSha256 === undefined
+      ? {}
+      : { expectedSha256: artifact.expectedSha256 }),
+    ...(artifact.actualSha256 === undefined
+      ? {}
+      : { actualSha256: artifact.actualSha256 }),
+    status: artifact.status,
+    managed: artifact.ownership === 'generated',
+    ...(artifact.media === undefined ? {} : { media: artifact.media }),
+  };
+}
+
+async function sourcesFromArtifacts(
+  projectRoot: string,
+  artifacts: readonly CatalogReportArtifact[],
+): Promise<readonly ReportSource[]> {
+  const sourcePaths = [
+    ...new Set(artifacts.flatMap((artifact) => artifact.sourceDependencies)),
+  ].sort((left, right) => left.localeCompare(right));
+  return Promise.all(
+    sourcePaths.map(async (sourcePath) => {
+      const absolutePath = path.isAbsolute(sourcePath)
+        ? sourcePath
+        : path.resolve(projectRoot, sourcePath);
+      const inspected = await inspectReportFile(absolutePath);
+      return {
+        path: reportRelativePath(projectRoot, absolutePath),
+        name: path.basename(absolutePath),
+        ...(inspected.bytes === undefined ? {} : { bytes: inspected.bytes }),
+        ...(inspected.sha256 === undefined
+          ? {}
+          : { sha256: inspected.sha256 }),
+        ...(inspected.media === undefined ? {} : { media: inspected.media }),
+      };
+    }),
+  );
+}
+
+function prettyConfiguration(configuration: string): string {
+  try {
+    return `${JSON.stringify(JSON.parse(configuration), null, 2)}\n`;
+  } catch {
+    return configuration;
+  }
+}
+
+async function richReportModel(
+  loaded: LoadedVersionedConfiguration,
+  catalog: CatalogReportModel,
+): Promise<ReportModel> {
+  const integrationGroup = catalog.resources.find(
+    (resource) => resource.id === '__target__',
+  );
+  const resources: ReportResource[] = await Promise.all(
+    catalog.resources
+      .filter((resource) => resource.id !== '__target__')
+      .map(async (resource) => ({
+        id: resource.id,
+        title: humanize(resource.id),
+        type: resource.type,
+        targets: resource.targets,
+        config: loaded.config.resources[resource.id] ?? {
+          type: resource.type,
+        },
+        sources: await sourcesFromArtifacts(
+          loaded.projectRoot,
+          resource.artifacts,
+        ),
+        outputs: resource.artifacts.map((artifact) =>
+          outputFromArtifact(loaded.projectRoot, artifact),
+        ),
+        issues: resource.issues,
+      })),
+  );
+  const integrationOutputs = (integrationGroup?.artifacts ?? []).map(
+    (artifact) => outputFromArtifact(loaded.projectRoot, artifact),
+  );
+  const allOutputs = [
+    ...resources.flatMap((resource) => resource.outputs),
+    ...integrationOutputs,
+  ];
+  const sources = new Set(
+    resources.flatMap((resource) =>
+      resource.sources.map((source) => source.path),
+    ),
+  ).size;
+  const issues = allOutputs.filter(
+    (output) => output.status !== 'valid',
+  ).length;
+  return {
+    configurationName: catalog.configurationName,
+    ...(loaded.config.metadata?.description === undefined
+      ? {}
+      : { description: loaded.config.metadata.description }),
+    fingerprint: catalog.configurationFingerprint,
+    configurationFiles: loaded.files.map((file) =>
+      reportRelativePath(loaded.projectRoot, file),
+    ),
+    targets: catalog.targets,
+    resources,
+    integration: {
+      outputs: integrationOutputs,
+      issues: integrationOutputs.filter(
+        (output) => output.status !== 'valid',
+      ).length,
+    },
+    effectiveConfiguration: prettyConfiguration(
+      catalog.effectiveConfiguration,
+    ),
+    sources,
+    outputs: allOutputs.length,
+    validOutputs: allOutputs.filter(
+      (output) => output.status === 'valid',
+    ).length,
+    issues,
+  };
 }
 
 export async function createCatalogReport(
@@ -204,9 +354,7 @@ export async function createCatalogReport(
         sourceDependencies: planned?.sourceDependencies ?? [],
         status: status(actual, entry?.sha256, sha256(output.content)),
         expectedSha256: sha256(output.content),
-        ...(actual === undefined
-          ? {}
-          : { actualSha256: actual.sha256, bytes: actual.bytes }),
+        ...inspectedArtifact(actual),
         ...(resolved?.publicPath === undefined
           ? {}
           : { publicPath: resolved.publicPath }),
@@ -226,9 +374,7 @@ export async function createCatalogReport(
           destination: task.destination,
           sourceDependencies: task.sourceDependencies,
           status: actual === undefined ? 'missing' : 'valid',
-          ...(actual === undefined
-            ? {}
-            : { actualSha256: actual.sha256, bytes: actual.bytes }),
+          ...inspectedArtifact(actual),
         });
         continue;
       }
@@ -253,9 +399,7 @@ export async function createCatalogReport(
           sourceDependencies: task.sourceDependencies,
           status: status(actual, entry?.sha256),
           ...(entry === undefined ? {} : { expectedSha256: entry.sha256 }),
-          ...(actual === undefined
-            ? {}
-            : { actualSha256: actual.sha256, bytes: actual.bytes }),
+          ...inspectedArtifact(actual),
         });
       }
     }
@@ -277,9 +421,7 @@ export async function createCatalogReport(
             : hasReceipt(artifact, loaded.projectRoot, receipts)
               ? 'valid'
               : 'untracked',
-        ...(actual === undefined
-          ? {}
-          : { actualSha256: actual.sha256, bytes: actual.bytes }),
+        ...inspectedArtifact(actual),
       });
     }
 
@@ -296,6 +438,7 @@ export async function createCatalogReport(
       effectiveConfiguration: options.planningContext.normalizedConfiguration,
       targets: plan.targets,
     });
+    const reportModel = await richReportModel(loaded, model);
     const destination = path.resolve(
       loaded.projectRoot,
       options.output ??
@@ -308,19 +451,17 @@ export async function createCatalogReport(
     );
     const disposition = await new AtomicWriter(loaded.projectRoot).writeIfChanged(
       destination,
-      Buffer.from(renderCatalogReport(model)),
+      Buffer.from(renderReportDocument(reportModel)),
     );
     return {
       path: destination,
       written: disposition === 'written',
-      healthy: model.issues === 0,
+      healthy: reportModel.issues === 0,
       configurationFingerprint,
       configurationName,
-      sources: new Set(
-        artifacts.flatMap((artifact) => artifact.sourceDependencies),
-      ).size,
-      outputs: model.outputs,
-      issues: model.issues,
+      sources: reportModel.sources,
+      outputs: reportModel.outputs,
+      issues: reportModel.issues,
     };
   } finally {
     await lock.release();

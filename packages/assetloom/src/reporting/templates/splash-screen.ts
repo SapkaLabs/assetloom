@@ -36,6 +36,9 @@ export function renderSplashScreen(resource: ReportResource): string {
   const config = resource.config as SplashScreenResource;
   const devices: string[] = [];
   for (const target of resource.targets) {
+    if (target !== 'android' && target !== 'ios') {
+      continue;
+    }
     for (const appearance of ['light', 'dark'] as const) {
       const details = config[appearance];
       if (details === undefined) {

@@ -37,7 +37,7 @@ export interface CreateHtmlReportOptions {
   readonly output?: string;
 }
 
-interface InspectedFile {
+export interface InspectedReportFile {
   readonly exists: boolean;
   readonly bytes?: number;
   readonly sha256?: string;
@@ -64,7 +64,7 @@ function isMissingError(error: unknown): boolean {
   );
 }
 
-function relativePath(root: string, filename: string): string {
+export function reportRelativePath(root: string, filename: string): string {
   return path.relative(root, filename).split(path.sep).join('/') || '.';
 }
 
@@ -81,6 +81,8 @@ function mimeType(filename: string): string | undefined {
       return 'image/jpeg';
     case '.gif':
       return 'image/gif';
+    case '.ico':
+      return 'image/x-icon';
     case '.json':
       return 'application/json';
     case '.xml':
@@ -90,7 +92,15 @@ function mimeType(filename: string): string | undefined {
     case '.md':
     case '.txt':
     case '.pbxproj':
+    case '.ts':
+    case '.tsx':
+    case '.js':
+    case '.jsx':
       return 'text/plain';
+    case '.html':
+      return 'text/html';
+    case '.css':
+      return 'text/css';
     default:
       return undefined;
   }
@@ -108,7 +118,7 @@ function mediaFor(filename: string, content: Buffer): ReportMedia {
   if (
     mime === 'application/json' ||
     mime === 'application/xml' ||
-    mime === 'text/plain'
+    mime?.startsWith('text/') === true
   ) {
     const complete = content.toString('utf8');
     const text =
@@ -162,7 +172,9 @@ async function inspectDirectory(
   };
 }
 
-async function inspectFile(filename: string): Promise<InspectedFile> {
+export async function inspectReportFile(
+  filename: string,
+): Promise<InspectedReportFile> {
   try {
     const details = await lstat(filename);
     if (details.isSymbolicLink()) {
@@ -303,7 +315,7 @@ async function reportOutput(
   managed: boolean,
 ): Promise<ReportOutput> {
   await assertSafeDestination(loaded.projectRoot, filename);
-  const inspected = await inspectFile(filename);
+  const inspected = await inspectReportFile(filename);
   let status: ReportAssetStatus;
   if (!inspected.exists) {
     status = 'missing';
@@ -334,7 +346,7 @@ async function reportOutput(
   return {
     taskId: task.id,
     label: outputLabel(task, filename),
-    path: relativePath(loaded.projectRoot, filename),
+    path: reportRelativePath(loaded.projectRoot, filename),
     target: task.target,
     operation: task.operation,
     ...(inspected.format === undefined
@@ -398,9 +410,9 @@ async function reportSources(
   return Promise.all(
     filenames.map(async (filename) => {
       await assertSafeDestination(loaded.projectRoot, filename);
-      const inspected = await inspectFile(filename);
+      const inspected = await inspectReportFile(filename);
       return {
-        path: relativePath(loaded.projectRoot, filename),
+        path: reportRelativePath(loaded.projectRoot, filename),
         name: path.basename(filename),
         ...(inspected.bytes === undefined ? {} : { bytes: inspected.bytes }),
         ...(inspected.sha256 === undefined
@@ -487,7 +499,7 @@ async function buildReportModel(
       : { description: loaded.config.metadata.description }),
     fingerprint,
     configurationFiles: loaded.files.map((file) =>
-      relativePath(loaded.projectRoot, file),
+      reportRelativePath(loaded.projectRoot, file),
     ),
     targets: plan.targets,
     resources,
