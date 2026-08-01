@@ -151,7 +151,8 @@ artwork into Android density resources and iOS image sets.
         }
       },
       "format": "jpeg",
-      "quality": 85
+      "quality": 85,
+      "onNameCollision": "prefer-output-format"
     }
   }
 }

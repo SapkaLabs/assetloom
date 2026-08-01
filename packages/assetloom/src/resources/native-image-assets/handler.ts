@@ -63,6 +63,60 @@ function imageName(source: ResolvedSource): string {
   return baseNameWithoutExtension(source.relativePath);
 }
 
+function preferredSourceExtensions(
+  format: NativeImageAssetsResource['format'],
+): ReadonlySet<string> {
+  return new Set(format === 'jpeg' ? ['.jpg', '.jpeg'] : [`.${format}`]);
+}
+
+function selectDistinctSources(
+  sources: readonly ResolvedSource[],
+  resource: NativeImageAssetsResource,
+): readonly ResolvedSource[] {
+  const grouped = new Map<string, ResolvedSource[]>();
+  for (const source of sources) {
+    const key = imageName(source).toLocaleLowerCase('en-US');
+    const group = grouped.get(key) ?? [];
+    group.push(source);
+    grouped.set(key, group);
+  }
+  const selected: ResolvedSource[] = [];
+  for (const [name, candidates] of grouped) {
+    if (candidates.length === 1) {
+      const candidate = candidates[0];
+      if (candidate !== undefined) {
+        selected.push(candidate);
+      }
+      continue;
+    }
+    if (resource.onNameCollision === 'prefer-output-format') {
+      const preferredExtensions = preferredSourceExtensions(resource.format);
+      const preferred = candidates.filter((candidate) =>
+        preferredExtensions.has(
+          path.extname(candidate.relativePath).toLocaleLowerCase('en-US'),
+        ),
+      );
+      if (preferred.length === 1) {
+        const candidate = preferred[0];
+        if (candidate !== undefined) {
+          selected.push(candidate);
+          continue;
+        }
+      }
+    }
+    throw new LoomError({
+      code: 'LOOM_PLAN_COLLISION',
+      message: `Multiple native image sources resolve to the name "${name}".`,
+      context: {
+        imageName: name,
+        onNameCollision: resource.onNameCollision ?? 'error',
+        sourcePaths: candidates.map((candidate) => candidate.absolutePath),
+      },
+    });
+  }
+  return selected;
+}
+
 function imageArtifact(options: {
   readonly destination: string;
   readonly format: NativeImageAssetsResource['format'];
@@ -184,12 +238,13 @@ export class NativeImageAssetsResourceHandler
     resource: NativeImageAssetsResource,
     context: Parameters<ResourceHandler<NativeImageAssetsResource>['plan']>[2],
   ): Promise<readonly CatalogPlannedArtifact[]> {
-    const sources = [
+    const resolvedSources = [
       ...(await context.sourceResolver.resolve(
         resource.source,
         `/resources/${resourceId}/source`,
       )),
     ].sort((left, right) => compareCodePoints(left.relativePath, right.relativePath));
+    const sources = selectDistinctSources(resolvedSources, resource);
     const target = context.resolveTarget(resource.output.target);
     if (target.kind !== 'react-native-app') {
       throw new LoomError({
@@ -198,8 +253,6 @@ export class NativeImageAssetsResourceHandler
         context: { target: target.id, targetKind: target.kind },
       });
     }
-    const names = sources.map(imageName);
-    assertUnique(names, (name) => name.toLocaleLowerCase('en-US'), 'imageName');
     const extension = outputExtension(resource.format);
     const artifacts: CatalogPlannedArtifact[] = [];
 

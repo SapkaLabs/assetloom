@@ -77,6 +77,7 @@ export interface IosImageScale {
 export interface NativeImageAssetsResource {
   readonly type: 'native-image-assets';
   readonly source: SourceDefinition;
+  readonly onNameCollision?: 'error' | 'prefer-output-format';
   readonly output: {
     readonly target: string;
     readonly android?: {

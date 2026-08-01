@@ -492,6 +492,46 @@ describe('native-image-assets resource', () => {
       ),
     ).rejects.toMatchObject({ code: 'LOOM_ANDROID_RESOURCE_INVALID' });
   });
+
+  it('resolves duplicate basenames only through an explicit output-format policy', async () => {
+    const projectRoot = await fixture();
+    await mkdir(path.join(projectRoot, 'native-images'));
+    const jpeg = path.join(projectRoot, 'native-images/welcome.jpg');
+    await writeFile(jpeg, 'jpeg source');
+    await writeFile(path.join(projectRoot, 'native-images/welcome.png'), 'png source');
+    const handler = new NativeImageAssetsResourceHandler();
+    const resource = {
+      type: 'native-image-assets' as const,
+      source: {
+        root: 'native-images',
+        include: ['**/*.{jpg,png}'],
+        required: true,
+      },
+      output: {
+        target: 'mobileApp',
+        android: {
+          resourceDirectory: 'android/app/src/main/res',
+          densities: [{ density: 'mdpi', width: 480 }],
+        },
+      },
+      format: 'jpeg' as const,
+    };
+    await expect(
+      handler.plan(
+        'duplicateImages',
+        resource,
+        reactNativePlanningContext(projectRoot),
+      ),
+    ).rejects.toMatchObject({ code: 'LOOM_PLAN_COLLISION' });
+
+    const artifacts = await handler.plan(
+      'duplicateImages',
+      { ...resource, onNameCollision: 'prefer-output-format' },
+      reactNativePlanningContext(projectRoot),
+    );
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]?.sourceDependencies).toEqual([jpeg]);
+  });
 });
 
 describe('font-family resource', () => {

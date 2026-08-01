@@ -562,6 +562,12 @@
         "source": {
           "$ref": "#/$defs/catalogSource"
         },
+        "onNameCollision": {
+          "enum": [
+            "error",
+            "prefer-output-format"
+          ]
+        },
         "output": {
           "$ref": "#/$defs/nativeImageAssetsOutput"
         },

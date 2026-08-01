@@ -123,6 +123,7 @@ function versionTwoConfiguration() {
         },
         format: 'jpeg',
         quality: 85,
+        onNameCollision: 'prefer-output-format',
       },
       branding: {
         type: 'web-app-branding',
