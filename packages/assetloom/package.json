@@ -25,7 +25,7 @@
   ],
   "scripts": {
     "build": "node ./scripts/clean-build.mjs && tsc -p tsconfig.build.json",
-    "prepack": "yarn build",
+    "prepack": "yarn --cwd ../.. build",
     "lint": "eslint src tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
