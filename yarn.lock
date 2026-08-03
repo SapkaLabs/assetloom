@@ -1790,6 +1790,7 @@ __metadata:
   resolution: "@sapkalabs/assetloom-core@workspace:packages/assetloom-core"
   dependencies:
     "@types/node": "npm:24.3.0"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -1800,6 +1801,7 @@ __metadata:
     "@sapkalabs/assetloom-core": "workspace:^"
     "@types/node": "npm:24.3.0"
     sharp: "npm:0.35.3"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -1809,6 +1811,7 @@ __metadata:
   dependencies:
     "@sapkalabs/assetloom-core": "workspace:^"
     "@sapkalabs/assetloom-images": "workspace:^"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 
@@ -1818,6 +1821,7 @@ __metadata:
   dependencies:
     "@sapkalabs/assetloom-core": "workspace:^"
     "@sapkalabs/assetloom-images": "workspace:^"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 
