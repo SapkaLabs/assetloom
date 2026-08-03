@@ -21,6 +21,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn workspace @sapkalabs/assetloom-core build && yarn build",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
