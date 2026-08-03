@@ -5,12 +5,14 @@ import { compareCodePoints } from '../domain/ordering.js';
 import { AtomicWriter } from './atomic-writer.js';
 import type { ProjectStatePathGuard } from './state-path-guard.js';
 
-const TARGET_ID_PATTERN = /^[A-Za-z][A-Za-z0-9_-]*$/;
+const TARGET_ID_PATTERN = /^[A-Za-z][A-Za-z0-9_.:-]*$/;
 
 export interface ManifestFile {
   readonly sha256: string;
   readonly taskId: string;
   readonly target: string;
+  readonly outputRootId?: string;
+  readonly outputRootPath?: string;
 }
 
 export interface AssetloomManifest {
@@ -39,7 +41,14 @@ function isManifestFile(value: unknown): value is ManifestFile {
     value.taskId.length > 0 &&
     'target' in value &&
     typeof value.target === 'string' &&
-    TARGET_ID_PATTERN.test(value.target)
+    TARGET_ID_PATTERN.test(value.target) &&
+    (!('outputRootId' in value) ||
+      (typeof value.outputRootId === 'string' &&
+        TARGET_ID_PATTERN.test(value.outputRootId))) &&
+    (!('outputRootPath' in value) ||
+      (typeof value.outputRootPath === 'string' &&
+        (value.outputRootPath === '.' ||
+          isPortableManifestPath(value.outputRootPath))))
   );
 }
 

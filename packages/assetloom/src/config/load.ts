@@ -124,6 +124,71 @@ function validateSemanticRules(
   }
 }
 
+function rejectRemovedOrRenamedOptions(
+  value: Record<string, unknown>,
+  files: readonly string[],
+  provenance: ReadonlyMap<string, { readonly file: string }>,
+): void {
+  const removed: Array<{ readonly pointer: string; readonly replacement: string }> = [];
+  const targets = isRecord(value['targets']) ? value['targets'] : {};
+  const android = isRecord(targets['android']) ? targets['android'] : {};
+  const ios = isRecord(targets['ios']) ? targets['ios'] : {};
+  if ('manifestPath' in android) {
+    removed.push({
+      pointer: '/targets/android/manifestPath',
+      replacement: 'Remove manifestPath and use native.resource usage descriptors for caller-owned Android setup.',
+    });
+  }
+  if ('projectFile' in ios) {
+    removed.push({
+      pointer: '/targets/ios/projectFile',
+      replacement: 'Remove projectFile and use native.resource usage descriptors for caller-owned Xcode setup.',
+    });
+  }
+  const resources = isRecord(value['resources']) ? value['resources'] : {};
+  for (const [resourceId, resource] of Object.entries(resources)) {
+    if (!isRecord(resource) || resource['type'] !== 'web-app-branding') continue;
+    const output = isRecord(resource['output']) ? resource['output'] : {};
+    if ('document' in output) {
+      removed.push({
+        pointer: `/resources/${resourceId}/output/document`,
+        replacement: 'Remove output.document and consume web usage descriptors in caller-owned HTML.',
+      });
+    }
+    if ('staticWebApp' in resource) {
+      removed.push({
+        pointer: `/resources/${resourceId}/staticWebApp`,
+        replacement: 'Replace staticWebApp with staticHost.includeCacheGuidance and apply the returned guidance yourself.',
+      });
+    }
+    const naming = isRecord(resource['naming']) ? resource['naming'] : {};
+    if (naming['strategy'] === 'stable') {
+      removed.push({
+        pointer: `/resources/${resourceId}/naming/strategy`,
+        replacement: 'Replace the legacy "stable" naming strategy with "none".',
+      });
+    }
+    if (naming['strategy'] === 'content-hash') {
+      removed.push({
+        pointer: `/resources/${resourceId}/naming/strategy`,
+        replacement: 'Replace the legacy "content-hash" naming strategy with "filename".',
+      });
+    }
+  }
+  const first = removed[0];
+  if (first !== undefined) {
+    throw new LoomError({
+      code: 'LOOM_CFG_MIGRATION',
+      message: 'AssetLoom configuration contains a removed or renamed option.',
+      context: {
+        file: provenance.get(first.pointer)?.file ?? files.at(-1),
+        jsonPointer: first.pointer,
+        reason: first.replacement,
+      },
+    });
+  }
+}
+
 export async function loadVersionedConfiguration(
   configuredFiles: readonly string[],
   options: LoadConfigurationOptions = {},
@@ -137,6 +202,7 @@ export async function loadVersionedConfiguration(
     })),
   );
   const merged = mergeConfigurations(values);
+  rejectRemovedOrRenamedOptions(merged.value, files, merged.provenance);
   validateSemanticRules(merged.value, files, merged.provenance);
 
   const ajv = new Ajv2020({

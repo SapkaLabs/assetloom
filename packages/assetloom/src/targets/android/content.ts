@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { LoomError } from '../../domain/errors.js';
 import type {
   AssetloomConfiguration,
@@ -115,64 +114,10 @@ function adaptiveIconXml(config: AssetloomConfiguration): string {
 `;
 }
 
-function setAttribute(
-  tag: string,
-  attribute: string,
-  value: string,
-): string {
-  const expression = new RegExp(`\\s${attribute}="[^"]*"`);
-  if (expression.test(tag)) {
-    return tag.replace(expression, ` ${attribute}="${value}"`);
-  }
-  if (/\/>$/.test(tag)) {
-    return tag.replace(/\s*\/>$/, ` ${attribute}="${value}" />`);
-  }
-  return tag.replace(/\s*>$/, ` ${attribute}="${value}">`);
-}
-
-function updateManifestContent(
-  source: string,
-  config: AssetloomConfiguration,
-): string {
-  const icon = appIcon(config);
-  const splashResource = splash(config);
-  const applicationMatch = source.match(/<application\b[^>]*>/);
-  if (applicationMatch === null) {
-    throw new LoomError({
-      code: 'LOOM_ANDROID_MANIFEST_UPDATE_FAILED',
-      message: 'Android manifest does not contain an application element.',
-    });
-  }
-
-  let applicationTag = applicationMatch[0];
-  if (icon?.type === 'app-icon' && icon.android !== undefined) {
-    applicationTag = setAttribute(
-      applicationTag,
-      'android:icon',
-      '@mipmap/ic_launcher',
-    );
-    applicationTag = setAttribute(
-      applicationTag,
-      'android:roundIcon',
-      '@mipmap/ic_launcher_round',
-    );
-  }
-  if (splashResource?.type === 'splash-screen') {
-    applicationTag = setAttribute(
-      applicationTag,
-      'android:theme',
-      '@style/AssetloomTheme',
-    );
-  }
-  const updated = source.replace(applicationMatch[0], applicationTag);
-
-  return updated.endsWith('\n') ? updated : `${updated}\n`;
-}
-
-export async function androidTaskContent(
+export function androidTaskContent(
   task: GenerationTask,
   config: AssetloomConfiguration,
-): Promise<Buffer> {
+): Buffer {
   if (task.id.includes(':adaptive-xml:')) {
     return Buffer.from(adaptiveIconXml(config));
   }
@@ -187,23 +132,6 @@ export async function androidTaskContent(
   }
   if (task.id === 'android:splash-drawable') {
     return Buffer.from(splashDrawableXml());
-  }
-  if (task.id === 'android:manifest') {
-    try {
-      return Buffer.from(
-        updateManifestContent(await readFile(task.destination, 'utf8'), config),
-      );
-    } catch (cause) {
-      if (cause instanceof LoomError) {
-        throw cause;
-      }
-      throw new LoomError({
-        code: 'LOOM_ANDROID_MANIFEST_UPDATE_FAILED',
-        message: 'Failed to update the Android manifest.',
-        cause,
-        context: { manifestPath: task.destination },
-      });
-    }
   }
   throw new LoomError({
     code: 'LOOM_PLAN_INVALID',

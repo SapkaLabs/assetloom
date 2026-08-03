@@ -17,7 +17,7 @@ export interface CatalogReportArtifact {
   readonly height?: number;
   readonly id: string;
   readonly operation: string;
-  readonly ownership: 'generated' | 'project-integration';
+  readonly ownership: 'generated';
   readonly media?: ReportMedia;
   readonly publicPath?: string;
   readonly resourceId: string;

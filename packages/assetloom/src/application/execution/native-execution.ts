@@ -3,11 +3,11 @@ import type {
   LoadedConfiguration,
 } from '../../domain/types.js';
 import type { MaterializedOwnedOutput } from '../../storage/owned-output-lifecycle.js';
-import type { PreparedProjectFileChange } from './project-integration-lifecycle.js';
+import type { UsageDescriptorV1 } from '../../domain/generation-result.js';
 
 export interface PreparedNativeExecution {
-  readonly integrations: readonly PreparedProjectFileChange[];
   readonly ownedOutputs: readonly MaterializedOwnedOutput[];
+  readonly usage: readonly UsageDescriptorV1[];
 }
 
 export interface NativeTaskExecutor {

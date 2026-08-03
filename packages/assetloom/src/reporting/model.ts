@@ -52,7 +52,7 @@ export interface ReportResource {
   readonly issues: number;
 }
 
-export interface ReportIntegration {
+export interface ReportTargetOutputs {
   readonly outputs: readonly ReportOutput[];
   readonly issues: number;
 }
@@ -64,7 +64,7 @@ export interface ReportModel {
   readonly configurationFiles: readonly string[];
   readonly targets: readonly string[];
   readonly resources: readonly ReportResource[];
-  readonly integration: ReportIntegration;
+  readonly targetOutputs: ReportTargetOutputs;
   readonly effectiveConfiguration: string;
   readonly sources: number;
   readonly outputs: number;

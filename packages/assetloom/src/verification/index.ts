@@ -1,6 +1,5 @@
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import sharp from 'sharp';
 import { LoomError } from '../domain/errors.js';
 import type {
@@ -81,141 +80,6 @@ function verifyStructuredContent(task: GenerationTask, content: Buffer): void {
   }
 }
 
-async function run(
-  command: string,
-  args: readonly string[],
-  cwd: string,
-  errorCode:
-    | 'LOOM_ANDROID_BUILD_VERIFICATION_FAILED'
-    | 'LOOM_IOS_BUILD_VERIFICATION_FAILED',
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd,
-      shell: process.platform === 'win32',
-      stdio: 'inherit',
-    });
-    child.once('error', (cause) => {
-      reject(
-        new LoomError({
-          code: errorCode,
-          message: `Native verification command "${command}" failed to start.`,
-          cause,
-          context: { command, args, cwd },
-        }),
-      );
-    });
-    child.once('exit', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(
-          new LoomError({
-            code: errorCode,
-            message: `Native verification command "${command}" failed.`,
-            context: { command, args, cwd, exitCode: code },
-          }),
-        );
-      }
-    });
-  });
-}
-
-async function findUp(
-  start: string,
-  filename: string,
-  boundary: string,
-): Promise<string | undefined> {
-  let directory = path.resolve(start);
-  const root = path.resolve(boundary);
-  for (;;) {
-    const candidate = path.join(directory, filename);
-    try {
-      await access(candidate);
-      return candidate;
-    } catch {
-      // Continue toward the project boundary.
-    }
-    if (directory === root) {
-      return undefined;
-    }
-    const parent = path.dirname(directory);
-    if (parent === directory) {
-      return undefined;
-    }
-    directory = parent;
-  }
-}
-
-async function verifyNativeTarget(
-  loaded: LoadedConfiguration,
-  target: TargetPlatform,
-): Promise<void> {
-  if (target === 'android') {
-    const androidTarget = loaded.config.targets.android;
-    if (androidTarget === undefined) {
-      throw new LoomError({
-        code: 'LOOM_PLAN_INVALID',
-        message: 'Android native verification was requested without an Android target.',
-      });
-    }
-    const manifestPath = path.resolve(
-      loaded.projectRoot,
-      androidTarget.manifestPath,
-    );
-    const wrapper = await findUp(
-      path.dirname(manifestPath),
-      process.platform === 'win32' ? 'gradlew.bat' : 'gradlew',
-      loaded.projectRoot,
-    );
-    if (wrapper === undefined) {
-      throw new LoomError({
-        code: 'LOOM_ANDROID_BUILD_VERIFICATION_FAILED',
-        message: 'Could not locate a Gradle wrapper for native verification.',
-      });
-    }
-    await run(wrapper, [':app:processDebugResources'], path.dirname(wrapper), 'LOOM_ANDROID_BUILD_VERIFICATION_FAILED');
-    return;
-  }
-
-  if (process.platform !== 'darwin') {
-    throw new LoomError({
-      code: 'LOOM_IOS_BUILD_VERIFICATION_FAILED',
-      message: 'iOS native verification requires macOS and Xcode.',
-    });
-  }
-  const iosTarget = loaded.config.targets.ios;
-  if (iosTarget === undefined) {
-    throw new LoomError({
-      code: 'LOOM_PLAN_INVALID',
-      message: 'iOS native verification was requested without an iOS target.',
-    });
-  }
-  const projectFile = path.resolve(
-    loaded.projectRoot,
-    iosTarget.projectFile,
-  );
-  const xcodeProject = path.dirname(projectFile);
-  const scheme = path.basename(xcodeProject, '.xcodeproj');
-  await run(
-    'xcodebuild',
-    [
-      '-project',
-      xcodeProject,
-      '-scheme',
-      scheme,
-      '-sdk',
-      'iphonesimulator',
-      '-configuration',
-      'Debug',
-      'CODE_SIGNING_ALLOWED=NO',
-      'build',
-    ],
-    path.dirname(xcodeProject),
-    'LOOM_IOS_BUILD_VERIFICATION_FAILED',
-  );
-}
-
 export interface VerifyOptions {
   readonly target?: TargetPlatform;
   readonly native?: boolean;
@@ -233,11 +97,6 @@ export async function verify(
   const checked: string[] = [];
 
   for (const task of plan.tasks) {
-    if (task.operation === 'update-project') {
-      await access(task.destination);
-      checked.push(task.destination);
-      continue;
-    }
     if (task.operation === 'copy' && task.format === 'directory') {
       const prefix = `${relative(loaded.projectRoot, task.destination)}/`;
       if (!Object.keys(manifest.files).some((item) => item.startsWith(prefix))) {
@@ -290,13 +149,7 @@ export async function verify(
   }
 
   const skippedNativeChecks: string[] = [];
-  if (options.native === true) {
-    for (const target of plan.targets) {
-      await verifyNativeTarget(loaded, target);
-    }
-  } else {
-    skippedNativeChecks.push(...plan.targets);
-  }
+  skippedNativeChecks.push(...plan.targets);
 
   return { ok: true, checked, skippedNativeChecks };
 }

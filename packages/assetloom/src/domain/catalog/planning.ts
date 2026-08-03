@@ -5,6 +5,7 @@ import type {
   SvgRuntime,
 } from './resources.js';
 import type { TargetId } from './targets.js';
+import type { UsageDescriptorV1 } from '../generation-result.js';
 
 export interface ArtifactPublicPath {
   readonly publicDirectory: string;
@@ -14,6 +15,10 @@ export interface ArtifactPublicPath {
 export interface StableArtifactPublication {
   readonly mode: 'stable';
   readonly publicPath?: ArtifactPublicPath;
+  readonly queryContentHash?: {
+    readonly parameter: 'v';
+    readonly hashLength: number;
+  };
 }
 
 export interface ContentHashArtifactPublication {
@@ -53,6 +58,16 @@ export interface CatalogArtifactBase {
   /** Stable logical identity used by planning collision diagnostics. */
   readonly destination: string;
   readonly presetVersion: string;
+  /** Portable semantic role exposed in generation results. */
+  readonly role?: string;
+  /** Explicit publication-root identity; inferred only by compatibility planners. */
+  readonly outputRootId?: string;
+  /** Normalized root-relative output path; inferred only by compatibility planners. */
+  readonly relativePath?: string;
+  /** Optional media type for the final complete output. */
+  readonly mediaType?: string;
+  /** Declarative caller guidance resolved only from planned artifact outputs. */
+  readonly usage?: readonly PlannedUsageDescriptorV1[];
 }
 
 export interface GeneratedCatalogArtifactBase extends CatalogArtifactBase {
@@ -145,91 +160,43 @@ export interface RenderImageArtifact extends GeneratedCatalogArtifactBase {
 
 export interface WriteTextArtifact extends GeneratedCatalogArtifactBase {
   readonly operation: 'write-text';
-  readonly content: string | ArtifactOutputReference;
+  readonly content: string | ArtifactOutputReference | JsonArtifactTemplate;
   readonly encoding: 'utf8';
 }
 
-export type JsonValue =
-  | null
-  | boolean
-  | number
-  | string
-  | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
-
-export interface InterpolatedIntegrationString {
+export interface InterpolatedArtifactString {
   readonly kind: 'interpolated';
   readonly parts: readonly (string | ArtifactOutputReference)[];
 }
 
-export type IntegrationValue =
-  | string
+export type PlannedUsageScalar =
   | ArtifactOutputReference
-  | InterpolatedIntegrationString;
+  | InterpolatedArtifactString;
 
-export type IntegrationJsonValue =
+export type PlannedJsonValue =
   | null
   | boolean
   | number
   | string
   | ArtifactOutputReference
-  | InterpolatedIntegrationString
-  | readonly IntegrationJsonValue[]
-  | { readonly [key: string]: IntegrationJsonValue };
+  | InterpolatedArtifactString
+  | readonly PlannedJsonValue[]
+  | { readonly [key: string]: PlannedJsonValue };
 
-export interface PublishedIntegrationResult {
-  readonly resultId: string;
-  /** Stable logical output path used when publication is not content-hashed. */
-  readonly destination: string;
-  readonly publication: ArtifactPublication;
+export interface JsonArtifactTemplate {
+  readonly kind: 'json-template';
+  readonly value: PlannedJsonValue;
 }
 
-export interface WebManifestIntegrationRecipe {
-  readonly adapter: 'web-app-manifest';
-  readonly stateKey: string;
-  readonly manifest: Readonly<Record<string, IntegrationJsonValue>>;
-  readonly publishedCopy?: PublishedIntegrationResult;
-}
-
-export interface HtmlHeadElement {
-  readonly element: 'link' | 'meta' | 'title';
-  readonly attributes?: Readonly<Record<string, IntegrationValue>>;
-  readonly text?: IntegrationValue;
-}
-
-export interface HtmlHeadIntegrationRecipe {
-  readonly adapter: 'html-head';
-  readonly stateKey: string;
-  readonly elements: readonly HtmlHeadElement[];
-}
-
-export interface StaticWebAppRoute {
-  readonly route: string;
-  readonly headers: Readonly<Record<string, string>>;
-}
-
-export interface StaticWebAppConfigIntegrationRecipe {
-  readonly adapter: 'static-web-app-config';
-  readonly stateKey: string;
-  readonly routes: readonly StaticWebAppRoute[];
-}
-
-export type ProjectIntegrationRecipe =
-  | WebManifestIntegrationRecipe
-  | HtmlHeadIntegrationRecipe
-  | StaticWebAppConfigIntegrationRecipe;
-
-export interface IntegrateProjectArtifact extends CatalogArtifactBase {
-  readonly operation: 'integrate-project';
-  readonly ownership: 'project-integration';
-  readonly integration: ProjectIntegrationRecipe;
+export interface PlannedUsageDescriptorV1
+  extends Omit<UsageDescriptorV1, 'payload'> {
+  readonly payload: PlannedJsonValue;
 }
 
 export type CatalogPlannedArtifact =
   | CopyFileArtifact
   | TransformSvgArtifact
   | RenderImageArtifact
-  | WriteTextArtifact
-  | IntegrateProjectArtifact;
+  | WriteTextArtifact;
 
 export type CatalogOperation = CatalogPlannedArtifact['operation'];

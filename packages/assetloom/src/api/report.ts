@@ -378,9 +378,6 @@ async function outputsForTask(
   task: GenerationTask,
   manifest: AssetloomManifest,
 ): Promise<ReportOutput[]> {
-  if (task.operation === 'update-project') {
-    return [await reportOutput(loaded, task, task.destination, undefined, false)];
-  }
   const entries = Object.entries(manifest.files)
     .filter(([, entry]) => entry.taskId === task.id)
     .sort(([left], [right]) => left.localeCompare(right));
@@ -470,19 +467,19 @@ async function buildReportModel(
     });
   }
 
-  const integrationTasks = plan.tasks.filter(
+  const targetTasks = plan.tasks.filter(
     (task) => task.resourceId === '__target__',
   );
-  const integrationOutputs = (
+  const targetOutputs = (
     await Promise.all(
-      integrationTasks.map(async (task) =>
+      targetTasks.map(async (task) =>
         outputsForTask(loaded, task, manifest),
       ),
     )
   ).flat();
   const allOutputs = [
     ...resources.flatMap((resource) => resource.outputs),
-    ...integrationOutputs,
+    ...targetOutputs,
   ];
   const uniqueSources = new Set(
     resources.flatMap((resource) =>
@@ -503,9 +500,9 @@ async function buildReportModel(
     ),
     targets: plan.targets,
     resources,
-    integration: {
-      outputs: integrationOutputs,
-      issues: integrationOutputs.filter(
+    targetOutputs: {
+      outputs: targetOutputs,
+      issues: targetOutputs.filter(
         (output) => output.status !== 'valid',
       ).length,
     },

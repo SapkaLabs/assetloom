@@ -1785,6 +1785,42 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@sapkalabs/assetloom-core@workspace:^, @sapkalabs/assetloom-core@workspace:packages/assetloom-core":
+  version: 0.0.0-use.local
+  resolution: "@sapkalabs/assetloom-core@workspace:packages/assetloom-core"
+  dependencies:
+    "@types/node": "npm:24.3.0"
+  languageName: unknown
+  linkType: soft
+
+"@sapkalabs/assetloom-images@workspace:^, @sapkalabs/assetloom-images@workspace:packages/assetloom-images":
+  version: 0.0.0-use.local
+  resolution: "@sapkalabs/assetloom-images@workspace:packages/assetloom-images"
+  dependencies:
+    "@sapkalabs/assetloom-core": "workspace:^"
+    "@types/node": "npm:24.3.0"
+    sharp: "npm:0.35.3"
+  languageName: unknown
+  linkType: soft
+
+"@sapkalabs/assetloom-native@workspace:^, @sapkalabs/assetloom-native@workspace:packages/assetloom-native":
+  version: 0.0.0-use.local
+  resolution: "@sapkalabs/assetloom-native@workspace:packages/assetloom-native"
+  dependencies:
+    "@sapkalabs/assetloom-core": "workspace:^"
+    "@sapkalabs/assetloom-images": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
+"@sapkalabs/assetloom-web@workspace:^, @sapkalabs/assetloom-web@workspace:packages/assetloom-web":
+  version: 0.0.0-use.local
+  resolution: "@sapkalabs/assetloom-web@workspace:packages/assetloom-web"
+  dependencies:
+    "@sapkalabs/assetloom-core": "workspace:^"
+    "@sapkalabs/assetloom-images": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "@sapkalabs/assetloom@workspace:^, @sapkalabs/assetloom@workspace:packages/assetloom":
   version: 0.0.0-use.local
   resolution: "@sapkalabs/assetloom@workspace:packages/assetloom"
@@ -1793,6 +1829,10 @@ __metadata:
     "@babel/parser": "npm:^7.29.7"
     "@babel/traverse": "npm:^7.29.7"
     "@babel/types": "npm:^7.29.7"
+    "@sapkalabs/assetloom-core": "workspace:^"
+    "@sapkalabs/assetloom-images": "workspace:^"
+    "@sapkalabs/assetloom-native": "workspace:^"
+    "@sapkalabs/assetloom-web": "workspace:^"
     "@svgr/core": "npm:^8.1.0"
     "@svgr/plugin-jsx": "npm:^8.1.0"
     "@svgr/plugin-prettier": "npm:^8.1.0"
@@ -2562,6 +2602,7 @@ __metadata:
     "@types/react": "npm:19.2.14"
     react: "npm:19.2.8"
     react-native: "npm:0.86.2"
+    typescript: "npm:6.0.3"
   languageName: unknown
   linkType: soft
 

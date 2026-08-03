@@ -353,7 +353,7 @@ h2, h3 { color: var(--ink); letter-spacing: -.025em; }
 .asset-details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .empty-state { display: grid; justify-items: center; gap: 5px; padding: 38px 20px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); background: var(--canvas); text-align: center; }
 .empty-state strong { color: var(--ink); }
-.integration { margin-top: 28px; }
+.target-outputs { margin-top: 28px; }
 .file-browser-section { margin-top: 28px; }
 .file-browser-description { max-width: 720px; margin: 9px 0 0; color: var(--ink-soft); font-size: 12px; }
 .file-browser { display: grid; height: min(760px, calc(100vh - 64px)); min-height: 620px; grid-template-columns: minmax(280px, 36%) minmax(420px, 64%); margin-top: 28px; overflow: auto; border: 1px solid var(--line-strong); border-radius: 14px; background: #fff; }
@@ -483,25 +483,25 @@ export function renderReportDocument(model: ReportModel): string {
   const resources = model.resources.map(renderResource).join('');
   const allOutputs = [
     ...model.resources.flatMap((resource) => resource.outputs),
-    ...model.integration.outputs,
+    ...model.targetOutputs.outputs,
   ];
-  const integration =
-    model.integration.outputs.length === 0
+  const targetOutputs =
+    model.targetOutputs.outputs.length === 0
       ? ''
       : `
-        <section class="overview-panel integration" id="project-integration">
+        <section class="overview-panel target-outputs" id="target-outputs">
           <div class="resource-heading">
             <div>
               <p class="eyebrow">Project wiring</p>
-              <h2>Project integration</h2>
+              <h2>Target-owned bundle files</h2>
             </div>
             ${
-              model.integration.issues === 0
+              model.targetOutputs.issues === 0
                 ? '<span class="section-health healthy"><span>✓</span> Integration files present</span>'
-                : `<span class="section-health unhealthy"><span>!</span> ${model.integration.issues} issue${model.integration.issues === 1 ? '' : 's'}</span>`
+                : `<span class="section-health unhealthy"><span>!</span> ${model.targetOutputs.issues} issue${model.targetOutputs.issues === 1 ? '' : 's'}</span>`
             }
           </div>
-          <div class="subsection">${renderOutputSummary(model.integration.outputs)}</div>
+          <div class="subsection">${renderOutputSummary(model.targetOutputs.outputs)}</div>
         </section>`;
   return `<!doctype html>
 <html lang="en">
@@ -572,7 +572,7 @@ export function renderReportDocument(model: ReportModel): string {
           </div>
         </section>
         ${resources}
-        ${integration}
+        ${targetOutputs}
         ${renderGeneratedFileTree(allOutputs)}
         <details class="configuration-details">
           <summary>View effective merged configuration</summary>

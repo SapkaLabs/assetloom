@@ -15,7 +15,34 @@ import {
 import { normalizeConfiguration } from '../src/config/normalize.js';
 import { targetId } from '../src/domain/catalog/targets.js';
 import type { FilesResource } from '../src/domain/catalog/resources.js';
+import type {
+  ArtifactPublication,
+  WriteTextArtifact,
+} from '../src/domain/catalog/planning.js';
 import { createGenerationPlan } from '../src/planner/index.js';
+import { FileSystemCatalogPublicationResolver } from '../src/storage/catalog-publication-resolver.js';
+import { sha256 } from '../src/storage/hash.js';
+
+function publicationArtifact(
+  destination: string,
+  publication: ArtifactPublication,
+): WriteTextArtifact {
+  return {
+    id: 'brand:web:logo',
+    resourceId: 'brand',
+    resourceType: 'web-app-branding',
+    target: targetId('web'),
+    operation: 'write-text',
+    ownership: 'generated',
+    publication,
+    dependsOn: [],
+    sourceDependencies: [],
+    destination,
+    presetVersion: 'test:1',
+    encoding: 'utf8',
+    content: 'same bytes',
+  };
+}
 
 function versionTwoConfiguration() {
   return {
@@ -141,7 +168,6 @@ function versionTwoConfiguration() {
           target: 'dashboard',
           directory: 'public/assets/brand',
           manifest: 'public/manifest.json',
-          document: 'public/index.html',
         },
         faviconSizes: [16, 32, 48],
         faviconIcoSizes: [16, 32, 48, 64, 256],
@@ -155,7 +181,7 @@ function versionTwoConfiguration() {
           maskable: 0.52,
         },
         naming: {
-          strategy: 'content-hash',
+          strategy: 'filename',
           hashLength: 12,
           fallbackFavicon: 'public/favicon.ico',
           fallbackManifest: 'public/manifest.json',
@@ -177,9 +203,8 @@ function versionTwoConfiguration() {
           includeIcons: true,
           includeManifest: true,
         },
-        staticWebApp: {
-          path: 'public/staticwebapp.config.json',
-          integrateCacheHeaders: true,
+        staticHost: {
+          includeCacheGuidance: true,
         },
         socialPreview: {
           width: 1200,
@@ -238,7 +263,6 @@ async function nativeFixture() {
         android: {
           enabled: true,
           resourceDirectory: './android/app/src/main/res',
-          manifestPath: './android/app/src/main/AndroidManifest.xml',
         },
       },
       resources: {
@@ -266,6 +290,58 @@ function unusedPlanningContext(projectRoot: string): PlanningContext {
 }
 
 describe('catalog architecture foundation', () => {
+  it('resolves stable, filename, and query publication from final bytes', () => {
+    const resolver = new FileSystemCatalogPublicationResolver();
+    const publicDirectory = path.resolve('fixture/public');
+    const destination = path.join(publicDirectory, 'assets/logo.png');
+    const content = Buffer.from('same bytes');
+    const digest = sha256(content);
+    const publicPath = { publicDirectory, publicBasePath: '/' };
+
+    const stable = resolver.resolveGenerated(
+      publicationArtifact(destination, { mode: 'stable', publicPath }),
+      { content },
+    ).output;
+    const filename = resolver.resolveGenerated(
+      publicationArtifact(destination, {
+        mode: 'content-hash',
+        directory: path.dirname(destination),
+        logicalName: 'logo',
+        extension: 'png',
+        hashLength: 12,
+        publicPath,
+      }),
+      { content },
+    ).output;
+    const query = resolver.resolveGenerated(
+      publicationArtifact(destination, {
+        mode: 'stable',
+        publicPath,
+        queryContentHash: { parameter: 'v', hashLength: 12 },
+      }),
+      { content },
+    ).output;
+
+    expect(stable).toMatchObject({
+      destination,
+      publicPath: '/assets/logo.png',
+      sha256: digest,
+      hashToken: digest,
+    });
+    expect(filename).toMatchObject({
+      destination: path.join(publicDirectory, `assets/logo.${digest.slice(0, 12)}.png`),
+      publicPath: `/assets/logo.${digest.slice(0, 12)}.png`,
+      sha256: digest,
+      hashToken: digest.slice(0, 12),
+    });
+    expect(query).toMatchObject({
+      destination,
+      publicPath: `/assets/logo.png?v=${digest.slice(0, 12)}`,
+      sha256: digest,
+      hashToken: digest.slice(0, 12),
+    });
+  });
+
   it('loads the closed version 2 contract with every catalog resource type', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-v2-schema-'));
     await writeFile(

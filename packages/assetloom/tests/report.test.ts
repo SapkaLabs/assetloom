@@ -46,7 +46,6 @@ async function reportFixture() {
         android: {
           enabled: true,
           resourceDirectory: './android/app/src/main/res',
-          manifestPath: './android/app/src/main/AndroidManifest.xml',
         },
       },
       resources: {

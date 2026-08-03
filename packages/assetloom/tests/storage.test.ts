@@ -1,53 +1,32 @@
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { GitIgnoreManager } from '../src/storage/gitignore-manager.js';
+import { readFile } from 'node:fs/promises';
+import { afterEach, describe, expect, it } from 'vitest';
+import { generateVersioned } from '../src/api/generate-v2.js';
+import { loadVersionedConfiguration } from '../src/config/load.js';
+import { createDefaultCatalogRuntime } from '../src/infrastructure/composition/default-catalog-runtime.js';
+import { sha256 } from '../src/storage/hash.js';
+import { createPublicationFixture } from './helpers/publication-fixture.js';
 
-describe('local Git ignore management', () => {
-  it('preserves existing content and other monorepo project entries', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'assetloom-ignore-'));
-    const project = path.join(root, 'apps', 'brand');
-    await mkdir(path.join(root, '.git', 'info'), { recursive: true });
-    await mkdir(project, { recursive: true });
-    await writeFile(
-      path.join(root, '.git', 'info', 'exclude'),
-      `*.local
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => Promise.all(cleanups.splice(0).map((cleanup) => cleanup())));
 
-# >>> assetloom generated resources >>>
-/apps/other/.assetloom/
-/apps/other/generated.png
-# <<< assetloom generated resources <<<
-`,
-    );
-
-    await new GitIgnoreManager(project).update([
-      path.join(project, 'android', 'generated.png'),
-    ]);
-    const content = await readFile(
-      path.join(root, '.git', 'info', 'exclude'),
-      'utf8',
-    );
-    expect(content).toContain('*.local');
-    expect(content).toContain('/apps/other/generated.png');
-    expect(content).toContain('/apps/brand/.assetloom/');
-    expect(content).toContain('/apps/brand/android/generated.png');
-  });
-
-  it('rejects malformed managed marker blocks', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'assetloom-ignore-'));
-    await mkdir(path.join(root, '.git', 'info'), { recursive: true });
-    await writeFile(
-      path.join(root, '.git', 'info', 'exclude'),
-      '# >>> assetloom generated resources >>>\n/generated.png\n',
-    );
-    await expect(
-      new GitIgnoreManager(root).update([]),
-    ).rejects.toMatchObject({ code: 'LOOM_GITIGNORE_INVALID_BLOCK' });
+describe('repository metadata ownership', () => {
+  it('never changes Git ignore metadata during generation', async () => {
+    const fixture = await createPublicationFixture('assetloom-repository-metadata-');
+    cleanups.push(() => fixture.cleanup());
+    await fixture.write('.git/info/exclude', '*.local\n');
+    await fixture.write('.gitignore', 'node_modules/\n');
+    await fixture.write('source.txt', 'content');
+    await fixture.write('assetloom.json', JSON.stringify({
+      schemaVersion: 2,
+      project: { root: '.' },
+      targets: { output: { kind: 'directory', root: './generated' } },
+      resources: { file: { type: 'files', source: { file: './source.txt' }, outputs: [{ target: 'output', directory: '.' }] } },
+    }));
+    const beforeExclude = sha256(await readFile(`${fixture.projectRoot}/.git/info/exclude`));
+    const beforeIgnore = sha256(await readFile(`${fixture.projectRoot}/.gitignore`));
+    const loaded = await loadVersionedConfiguration(['assetloom.json'], { cwd: fixture.projectRoot });
+    await generateVersioned(loaded, createDefaultCatalogRuntime(loaded));
+    expect(sha256(await readFile(`${fixture.projectRoot}/.git/info/exclude`))).toBe(beforeExclude);
+    expect(sha256(await readFile(`${fixture.projectRoot}/.gitignore`))).toBe(beforeIgnore);
   });
 });

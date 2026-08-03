@@ -1,0 +1,158 @@
+<!--
+Sync Impact Report
+- Version change: template (unratified) -> 1.0.0
+- Modified principles: all template placeholders replaced by AssetLoom governance
+- Added sections: Product and Package Constraints; Specification-Driven Delivery
+- Removed sections: none (template placeholders resolved)
+- Follow-up TODOs: none
+-->
+# AssetLoom Constitution
+
+## Core Principles
+
+### I. Publish-and-Describe
+AssetLoom MUST remain a deterministic asset compiler and whole-file publisher. It MAY read declared
+source assets and configuration; transform, generate, or copy resource files; publish complete
+AssetLoom-owned files beneath explicit output roots; maintain its dedicated cache, ownership
+manifest, and recoverable publication state; and return a complete structured description of the
+resulting artifacts. AssetLoom MUST NOT act as a consumer-application integration or
+project-configuration tool. The caller alone decides how outputs are referenced by HTML, source
+code, native manifests, build configuration, application metadata, or framework-specific code.
+
+### II. Consumer Projects Are Read-Only
+AssetLoom MUST NOT parse or semantically inspect consumer application files to discover integration
+points, nor patch, append, merge into, or partially rewrite them. Forbidden destinations include
+HTML, JSX, TSX, consumer-owned CSS, `package.json`, web application manifests, `Info.plist`,
+`.pbxproj`, `AndroidManifest.xml`, Gradle files, build scripts, application configuration, and
+equivalent files. AssetLoom MUST NOT inject imports, elements, links, registrations, resource
+references, or dependencies, and MUST NOT modify `.git/info/exclude` or other repository metadata.
+These capabilities MUST NOT be exposed through adapters, compatibility layers, callbacks, script
+hooks, generic file gateways, plugins, or other escape hatches. Android, iOS, React Native, and web
+support describes complete output assets and usage metadata; it never grants permission to configure
+the consuming application. A candidate destination MAY be statted or read only to establish
+ownership, detect a collision, or compare complete output bytes; its consumer semantics MUST NOT be
+interpreted. Required consumer setup MUST be returned as deterministic typed usage data and
+documented for the caller to perform.
+
+### III. Whole-File Ownership and Bounded Publication
+Every runtime output MUST be a newly created complete AssetLoom-owned file, a replacement or
+unchanged instance of a manifest-recorded AssetLoom-owned file, or a rejected ownership collision.
+Existing unowned destinations MUST NOT be overwritten. Stale cleanup MUST remove only
+manifest-recorded AssetLoom outputs and MUST NOT remove unrelated or user-owned files after any
+configuration change. Complete metadata intrinsic to an owned generated resource, such as an iOS
+asset-catalog `Contents.json`, is allowed; consumer application configuration and manifests remain
+forbidden.
+
+All writes MUST remain beneath explicitly configured output roots or AssetLoom's dedicated
+cache/state root. Relative output paths MUST reject absolute forms, `..` traversal, symlink or
+junction escapes, case-normalized collisions, duplicate destinations, and any boundary escape.
+Planning, validation, ownership checks, and predictable collision checks MUST finish before
+publication begins. Unexpected I/O interruption MUST leave explicit recoverable state and MUST NOT
+report a partially published run as successful.
+
+### IV. Declarative Planning and Enforced Package Boundaries
+Resource handlers and target packages MUST produce declarative plans for complete files and MUST NOT
+write directly. Only the bounded publisher MAY write generated artifacts. The official extension
+contract MUST NOT contain patch, merge, HTML append, manifest/plist update, Xcode registration,
+project-integration, or arbitrary project-file callback operations. Targets describe layouts,
+filenames, semantic roles, and usage metadata rather than configuring consumers.
+
+Core MUST remain resource-neutral and MUST NOT depend on Sharp, Commander, native, web, or
+image-specific implementations. Images MAY depend on core; native and web MAY depend on core and
+images; the CLI/facade MAY depend on all four. Dependency cycles and private cross-package `src`
+imports are forbidden. Every public entry point MUST be declared through package exports. CLI
+commands belong only in the executable package. Package boundaries MUST be enforced by automated
+architecture checks. Extraction SHOULD be incremental and reuse proven code; no vague utility
+package or speculative plugin abstraction may be introduced. Existing supported non-image behavior
+MUST be retained in an appropriately focused package or explicitly justified in the feature plan.
+
+### V. Determinism, Versioned Results, and Content Identity
+Given identical inputs, configuration, package versions, and platform-independent settings, planned
+outputs, generated bytes, result ordering, and deterministic result data MUST be identical. An
+unchanged second run MUST perform zero content writes. The portable deterministic result MUST NOT
+contain timestamps, random identifiers, absolute machine-specific paths, or nondeterministic
+ordering.
+
+The Node API and CLI JSON output MUST expose the same versioned, JSON-serializable result containing
+the complete current artifact catalog (created, updated, and unchanged), removed owned artifacts,
+typed versioned usage descriptors, diagnostics, selected targets, normalized portable paths, and
+the full SHA-256 digest of final output bytes. Schema changes require a new result version. Usage
+descriptors MUST resolve to returned artifact identities and remain caller-consumed data only.
+
+Internal render fingerprints MUST include only byte-affecting inputs: source bytes, effective
+recipe and encoding options, renderer compatibility version, and relevant algorithm/plugin version.
+They MUST exclude unrelated configuration, destinations, public URLs, timestamps, and absolute
+machine paths. Browser cache busting MUST use final encoded output bytes, never a destination or
+source-only hash. Web policies MUST explicitly support compatible stable names, hash-bearing
+filenames, and hash-bearing query paths; the full digest is always returned and shortened tokens
+MUST use safe documented deterministic bounds.
+
+### VI. Stable Errors and Deliberate Compatibility
+Every public failure MUST use a stable `LOOM_` code. Dependency failures MUST be preserved as causes
+where supported, and catch-all conversion MUST NOT discard useful diagnostics. Existing supported
+generation behavior and public APIs SHOULD remain compatible unless they conflict with this
+constitution. Forbidden consumer mutation MUST be removed even when that is breaking; every
+deliberate break requires migration documentation and before/after API and CLI guidance. Expo
+remains out of scope. This refactor MUST NOT add new resource types. Incremental extraction of
+proven behavior is preferred over a clean-room rewrite.
+
+### VII. Automated Boundary Evidence
+Behavioral and architectural changes MUST have automated tests. Tests MUST prove write containment,
+consumer sentinel preservation, traversal and link rejection, pre-publication collision failure,
+manifest-only stale cleanup, idempotency, deterministic bytes and results, recoverable interruption,
+complete result semantics, stable CLI JSON, final-byte hashing, cache independence from destinations
+and unrelated configuration, package dependency rules, public exports, and clean packed-package
+consumption. Architecture boundaries MUST be enforced in code structure and tests, not prose alone.
+Obsolete mutation tests MUST be replaced by descriptor, ownership, and caller-integration boundary
+tests; legitimate tests MUST NOT be weakened merely to pass a migration.
+
+## Product and Package Constraints
+
+The required initial workspace packages and responsibilities are:
+
+- `@sapkalabs/assetloom-core`: resource-neutral contracts, composition, planning/execution
+  orchestration, hashing, cache, ownership, bounded publication, recovery, diagnostics, and result
+  versions.
+- `@sapkalabs/assetloom-images`: generic image inspection/transformation, Sharp integration,
+  encoders, recipes, dimensions, formats, and verification.
+- `@sapkalabs/assetloom-native`: Android, iOS, and React Native presets, validation, semantic roles,
+  complete native layouts, and typed native usage descriptors.
+- `@sapkalabs/assetloom-web`: web presets, favicons, social/PWA variants, public-path resolution,
+  final-content-hash policies, and typed web usage descriptors.
+- `@sapkalabs/assetloom`: Commander CLI, valid compatibility facade, default composition, human and
+  JSON output, and executable entry point.
+
+The repository MUST retain its Yarn workspace conventions and keep package versions in lockstep
+until a stronger documented release policy supersedes this rule. Publication MUST resolve a final
+hash-bearing filename only after rendering and hashing final bytes, then preflight ownership and
+collisions, publish, record the final path, and remove only a manifest-owned obsolete predecessor.
+
+## Specification-Driven Delivery
+
+Architectural work MUST begin with this constitution and an ADR, then a short dependency-ordered
+roadmap of bounded Spec Kit features. Each feature MUST execute, in order, specify, clarify, plan,
+checklist, tasks, analyze, implement, and converge. Prompt decisions are treated as resolved rather
+than reopened. Specifications define observable behavior; plans define package/file architecture;
+checklists test requirement quality; tasks remain executable and traceable. Implementation MUST NOT
+begin while analysis has unresolved critical or high contradictions. Issues MUST be repaired in the
+artifact that owns them and analysis rerun. Large work MUST proceed in bounded phases with relevant
+tests after each phase. Convergence MUST repeat with implementation until no remaining tasks are
+appended.
+
+Before refactoring, maintainers MUST record repository-standard install, format, lint, type-check,
+test, build, packing, and CLI smoke commands and distinguish baseline failures from regressions.
+Completion requires repository-standard checks, package/export and clean-consumer smoke tests,
+human and JSON CLI smoke tests, idempotency evidence, a forbidden-capability search, final Spec Kit
+analysis, final convergence, documentation, migration guidance, and an accurate working-tree report.
+
+## Governance
+
+This constitution supersedes conflicting specifications, plans, tasks, documentation, compatibility
+claims, and implementation conventions. Reviews and pull requests MUST cite the governing principle
+for any exception request; an exception that weakens a MUST requires a prior constitution amendment,
+an ADR, and a migration plan. Amendments use semantic versioning: MAJOR for removed or incompatibly
+redefined governance, MINOR for new principles or materially expanded obligations, and PATCH for
+non-semantic clarifications. Every amendment MUST include a Sync Impact Report, ISO dates, and a
+compliance review of active Spec Kit artifacts, public contracts, architecture tests, and ADRs.
+
+**Version**: 1.0.0 | **Ratified**: 2026-08-02 | **Last Amended**: 2026-08-02

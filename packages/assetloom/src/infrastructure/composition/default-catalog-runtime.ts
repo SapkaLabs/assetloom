@@ -5,7 +5,6 @@ import type {
   CatalogArtifactVerifier,
   ResolvedCatalogArtifactOutput,
 } from '../../application/execution/contracts.js';
-import { DefaultProjectIntegrationAdapterRegistry } from '../../application/execution/project-integration-adapter-registry.js';
 import type { PlanningContext } from '../../application/planning/contracts.js';
 import { ResourceHandlerRegistry } from '../../application/planning/resource-handler-registry.js';
 import { normalizeConfiguration } from '../../config/normalize.js';
@@ -19,9 +18,6 @@ import { LoomError } from '../../domain/errors.js';
 import type { LoadedVersionedConfiguration } from '../../domain/types.js';
 import { ImageArtifactMaterializer } from '../images/image-materializer.js';
 import { NodeSourceResolver } from '../sources/node-source-resolver.js';
-import { HtmlHeadIntegrationAdapter } from '../web-integration/html-head-adapter.js';
-import { StaticWebAppConfigIntegrationAdapter } from '../web-integration/static-web-app-config-adapter.js';
-import { WebManifestIntegrationAdapter } from '../web-integration/web-manifest-adapter.js';
 import { CopyFileMaterializer } from '../../resources/files/materialize.js';
 import { FilesResourceHandler } from '../../resources/files/handler.js';
 import { FontFamilyResourceHandler } from '../../resources/font-family/handler.js';
@@ -34,7 +30,6 @@ import { SvgComponentMaterializer } from '../../resources/svg-components/materia
 import { WebAppBrandingResourceHandler } from '../../resources/web-app-branding/handler.js';
 
 export interface DefaultCatalogRuntime {
-  readonly integrationAdapters: DefaultProjectIntegrationAdapterRegistry;
   readonly materializers: CatalogMaterializerRegistry;
   readonly planningContext: PlanningContext;
   readonly resourceHandlers: ResourceHandlerRegistry;
@@ -209,11 +204,6 @@ export function createDefaultCatalogRuntime(
       'transform-svg': new SvgComponentMaterializer(),
       'render-image': new ImageArtifactMaterializer(),
       'write-text': new WriteTextMaterializer(),
-    }),
-    integrationAdapters: new DefaultProjectIntegrationAdapterRegistry({
-      'web-app-manifest': new WebManifestIntegrationAdapter(),
-      'html-head': new HtmlHeadIntegrationAdapter(),
-      'static-web-app-config': new StaticWebAppConfigIntegrationAdapter(),
     }),
     structuralVerifiers: [
       new ImageArtifactStructuralVerifier(),

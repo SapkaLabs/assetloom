@@ -98,12 +98,20 @@ export interface ForegroundScalePolicy {
   readonly overrides?: Readonly<Record<string, number>>;
 }
 
-export interface WebBrandNamingPolicy {
-  readonly strategy: 'content-hash' | 'stable';
-  readonly hashLength?: number;
-  readonly fallbackFavicon?: string;
-  readonly fallbackManifest?: string;
-}
+export type WebBrandNamingPolicy =
+  | {
+      readonly strategy: 'none';
+    }
+  | {
+      readonly strategy: 'filename';
+      readonly hashLength?: number;
+      readonly fallbackFavicon?: string;
+      readonly fallbackManifest?: string;
+    }
+  | {
+      readonly strategy: 'query';
+      readonly hashLength?: number;
+    };
 
 export interface WebBrandManifestMetadata {
   readonly themeColor?: string;
@@ -135,9 +143,8 @@ export interface WebBrandSeoMetadata {
   readonly includeManifest?: boolean;
 }
 
-export interface StaticWebAppIntegrationConfiguration {
-  readonly path: string;
-  readonly integrateCacheHeaders: boolean;
+export interface WebStaticHostGuidanceConfiguration {
+  readonly includeCacheGuidance: boolean;
 }
 
 export interface WebAppBrandingResource {
@@ -156,7 +163,6 @@ export interface WebAppBrandingResource {
     readonly target: string;
     readonly directory: string;
     readonly manifest?: string;
-    readonly document?: string;
   };
   readonly faviconSizes: readonly number[];
   readonly faviconIcoSizes?: readonly number[];
@@ -169,10 +175,10 @@ export interface WebAppBrandingResource {
     readonly application?: number;
     readonly maskable?: number;
   };
-  readonly naming: WebBrandNamingPolicy;
+  readonly naming?: WebBrandNamingPolicy;
   readonly manifest: WebBrandManifestMetadata;
   readonly seo?: WebBrandSeoMetadata;
-  readonly staticWebApp?: StaticWebAppIntegrationConfiguration;
+  readonly staticHost?: WebStaticHostGuidanceConfiguration;
   readonly socialPreview?: {
     readonly width: number;
     readonly height: number;

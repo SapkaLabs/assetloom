@@ -7,13 +7,11 @@
   "targets": {
     "android": {
       "enabled": true,
-      "resourceDirectory": "./android/app/src/main/res",
-      "manifestPath": "./android/app/src/main/AndroidManifest.xml"
+      "resourceDirectory": "./android/app/src/main/res"
     },
     "ios": {
       "enabled": true,
       "projectDirectory": "./ios/AssetloomDemo",
-      "projectFile": "./ios/AssetloomDemo.xcodeproj/project.pbxproj",
       "assetCatalogDirectory": "./ios/AssetloomDemo/Images.xcassets"
     }
   },

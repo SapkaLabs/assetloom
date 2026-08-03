@@ -140,7 +140,7 @@ function outputDetails(output: ReportOutput): string {
       'Ownership',
       output.managed
         ? 'Assetloom managed'
-        : 'Project integration',
+        : 'Target-owned bundle files',
     ),
   ].join('');
 }
@@ -187,7 +187,7 @@ export function renderGeneratedFileTree(
         <div>
           <p class="eyebrow">Complete generated inventory</p>
           <h2>Generated file browser</h2>
-          <p class="file-browser-description">The visual sections above use one representative output per appearance. This tree contains every generated resolution and integration file. Select any file to inspect its embedded content and technical metadata.</p>
+          <p class="file-browser-description">The visual sections above use one representative output per appearance. This tree contains every generated file. Select any file to inspect its embedded content and technical metadata.</p>
         </div>
         <span class="count ${issues > 0 ? 'count-danger' : ''}">${outputs.length} files${issues > 0 ? ` · ${issues} issues` : ''}</span>
       </div>

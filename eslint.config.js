@@ -14,7 +14,7 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
-    files: ['packages/assetloom/**/*.ts'],
+    files: ['packages/*/**/*.ts'],
     languageOptions: {
       parserOptions: {
         projectService: true,

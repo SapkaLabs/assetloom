@@ -17,7 +17,6 @@ import { verifyV2 } from '../src/api/verify-v2.js';
 import type { LoadedVersionedConfiguration } from '../src/domain/types.js';
 import { createDefaultCatalogRuntime } from '../src/infrastructure/composition/default-catalog-runtime.js';
 import { ContentCache } from '../src/storage/cache.js';
-import { IntegrationReceiptStore } from '../src/storage/integration-receipt-store.js';
 import { ProjectLock } from '../src/storage/lock.js';
 import { ManifestStore } from '../src/storage/manifest.js';
 import { ProjectStatePathGuard } from '../src/storage/state-path-guard.js';
@@ -96,8 +95,6 @@ describe('v2 state-path containment', () => {
       () => new ProjectLock(stateDirectory, statePaths).acquire(),
       () =>
         new ManifestStore(projectRoot, stateDirectory, { statePaths }).load(),
-      () =>
-        new IntegrationReceiptStore(projectRoot, stateDirectory, statePaths).load(),
       () => new ContentCache(stateDirectory, statePaths).get('a'.repeat(64)),
       () => new ContentCache(stateDirectory, statePaths).put(Buffer.from('cached')),
     ];
@@ -112,10 +109,7 @@ describe('v2 state-path containment', () => {
     const lifecycleOperations: readonly (() => Promise<unknown>)[] = [
       () => generateV2(loaded, runtime),
       () => verifyV2(loaded, runtime),
-      () =>
-        cleanV2(loaded, {
-          integrationAdapters: runtime.integrationAdapters,
-        }),
+      () => cleanV2(loaded),
       () => createCatalogReport(loaded, runtime),
     ];
     for (const operation of lifecycleOperations) {

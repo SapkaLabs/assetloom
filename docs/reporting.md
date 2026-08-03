@@ -78,9 +78,10 @@ generated. It remains an independent snapshot even when the next customer
 configuration reuses the same native project paths.
 
 In CI, archive `.assetloom/reports/*.html` after all customer configurations
-have run. Reports inside `.assetloom/` are local generated state and remain
-Git-ignored. A custom `reports/` destination can be committed if the project
-wants reviewed snapshots in source control.
+have run. Reports inside `.assetloom/` are local generated state; the consuming
+repository decides whether to ignore them. AssetLoom never edits ignore files.
+A custom `reports/` destination can be committed if the project wants reviewed
+snapshots in source control.
 
 ## What the dashboard contains
 
@@ -93,10 +94,10 @@ wants reviewed snapshots in source control.
   cards for every native density;
 - a complete collapsible generated-file tree with click-to-preview inspection
   in a persistent two-pane browser for every image, structured resource, and
-  native integration file;
+  generated native bundle file;
 - dimensions, byte size, task, operation, path, ownership, and hashes;
 - manifest comparisons that flag missing, modified, or untracked outputs;
-- native manifest and Xcode-project integration status;
+- caller-safe native usage guidance;
 - the complete effective merged configuration.
 
 Resource presentation is modular. App icons, notification icons, and splash

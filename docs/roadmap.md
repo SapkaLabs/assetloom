@@ -1,4 +1,10 @@
-# Roadmap
+# Original delivery roadmap
+
+This roadmap records the original implementation sequence. The current
+publish-and-describe migration is tracked separately in
+[its architecture roadmap](architecture/publish-and-describe-migration-roadmap.md).
+Where the original wording implied application mutation, the current boundary
+below supersedes it.
 
 ## Phase 0 — native-platform research and architecture
 
@@ -17,23 +23,24 @@ JSON Schema, and native target validation.
 
 ## Phase 3 — error and storage foundations
 
-`LoomError`, stable `LOOM_` codes, content cache, manifest, project lock, atomic
-writes, safe cleanup, and local Git ignore management.
+`LoomError`, stable `LOOM_` codes, content cache, ownership manifest, project
+lock, atomic writes, safe cleanup, and caller-owned repository ignore policy.
 
 ## Phase 4 — Android resources
 
-Legacy, round, adaptive, monochrome, notification, day/night splash, manifest
-integration, and Gradle/AAPT2 compilation.
+Legacy, round, adaptive, monochrome, notification, day/night splash, typed
+caller setup descriptors, and Gradle/AAPT2 compilation of complete outputs.
 
 ## Phase 5 — iOS resources
 
 Opaque `.icon` passthrough, light/dark/tinted catalog mode, day/night launch
-resources, Xcode integration, and Xcode/actool compilation.
+resources, typed caller setup descriptors, and Xcode/actool compilation of
+complete outputs.
 
 ## Phase 6 — bare React Native demo
 
 Base and brand configuration, generated runtime override example, both native
-projects, ignored generated files, and second-run no-op proof.
+projects, caller-configured ignored outputs, and second-run no-op proof.
 
 ## Phase 7 — hardening
 

@@ -14,7 +14,7 @@ import type { ProjectStatePathGuard } from './state-path-guard.js';
 export interface PendingGenerationIntent {
   readonly fingerprint: string;
   readonly selectedTargets: readonly string[];
-  readonly version: 1;
+  readonly version: 2;
 }
 
 export type PendingGenerationDisposition = 'created' | 'resumed';
@@ -32,7 +32,7 @@ function isPendingGenerationIntent(
     typeof value === 'object' &&
     value !== null &&
     'version' in value &&
-    value.version === 1 &&
+    value.version === 2 &&
     'fingerprint' in value &&
     typeof value.fingerprint === 'string' &&
     /^[0-9a-f]{64}$/u.test(value.fingerprint) &&
@@ -182,7 +182,7 @@ export class PendingGenerationStore {
       await this.#statePaths.assertSafe(this.#filename);
       await this.#statePaths.assertSafe(temporary);
       const document = {
-        version: 1 as const,
+        version: 2 as const,
         fingerprint: intent.fingerprint,
         selectedTargets: [...intent.selectedTargets].sort(compareCodePoints),
       };

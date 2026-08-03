@@ -4,10 +4,10 @@ import type {
   ArtifactOutputReference,
   CatalogPlannedArtifact,
   CompositeImageRecipe,
-  HtmlHeadElement,
   ImageCompositeLayer,
-  IntegrateProjectArtifact,
-  IntegrationValue,
+  InterpolatedArtifactString,
+  PlannedJsonValue,
+  PlannedUsageDescriptorV1,
   RenderImageArtifact,
 } from '../../domain/catalog/planning.js';
 import type {
@@ -16,11 +16,15 @@ import type {
 } from '../../domain/catalog/resources.js';
 import type { ResolvedSource } from '../../domain/catalog/sources.js';
 import { LoomError } from '../../domain/errors.js';
-import { compareCodePoints } from '../../domain/ordering.js';
 import type {
   PlanningContext,
   ResourceHandler,
 } from '../../application/planning/contracts.js';
+import {
+  assertWebHashTokenLength,
+  DEFAULT_WEB_CACHE_BUST_POLICY,
+  DEFAULT_WEB_HASH_TOKEN_LENGTH,
+} from '@sapkalabs/assetloom-web';
 import { resolveWebBrandingPreset } from './presets.js';
 
 function inside(root: string, configuredPath: string): string {
@@ -79,7 +83,7 @@ function outputReference(
 function absoluteUrl(
   siteUrl: string | undefined,
   reference: ArtifactOutputReference,
-): IntegrationValue {
+): string | ArtifactOutputReference | InterpolatedArtifactString {
   const base = siteUrl?.trim().replace(/\/+$/, '');
   return base === undefined || base === ''
     ? reference
@@ -113,14 +117,21 @@ export class WebAppBrandingResourceHandler
 
   validate(resource: WebAppBrandingResource): void {
     const preset = resolveWebBrandingPreset(resource.preset);
-    if (
-      resource.naming.strategy === 'content-hash' &&
-      resource.naming.hashLength === undefined
-    ) {
-      throw new LoomError({
-        code: 'LOOM_PLAN_INVALID',
-        message: 'Content-hashed web branding requires a hash length.',
-      });
+    const naming = resource.naming ?? {
+      strategy: DEFAULT_WEB_CACHE_BUST_POLICY,
+    };
+    if (naming.strategy !== 'none') {
+      try {
+        assertWebHashTokenLength(
+          naming.hashLength ?? DEFAULT_WEB_HASH_TOKEN_LENGTH,
+        );
+      } catch (cause) {
+        throw new LoomError({
+          code: 'LOOM_PLAN_INVALID',
+          message: 'Web cache-busting hash length must be from 8 through 64.',
+          cause,
+        });
+      }
     }
     if (
       resource.seo?.includeManifest === true &&
@@ -234,7 +245,13 @@ export class WebAppBrandingResourceHandler
       resource.sources.socialPreview === undefined
         ? undefined
         : oneSource(socialSources, resourceId, 'social preview');
-    const hashLength = resource.naming.hashLength ?? 12;
+    const naming = resource.naming ?? {
+      strategy: DEFAULT_WEB_CACHE_BUST_POLICY,
+    };
+    const hashLength =
+      naming.strategy === 'none'
+        ? DEFAULT_WEB_HASH_TOKEN_LENGTH
+        : naming.hashLength ?? DEFAULT_WEB_HASH_TOKEN_LENGTH;
     const artifacts: CatalogPlannedArtifact[] = [];
     const imageByLogicalName = new Map<string, RenderImageArtifact>();
     const publication = (
@@ -242,9 +259,13 @@ export class WebAppBrandingResourceHandler
       logicalName: string,
       extension: string,
       fallbackDestination?: string,
-    ): ArtifactPublication =>
-      resource.naming.strategy === 'content-hash'
-        ? {
+    ): ArtifactPublication => {
+      const publicPath = {
+        publicDirectory,
+        publicBasePath: webTarget.publicBasePath,
+      };
+      if (naming.strategy === 'filename') {
+        return {
             mode: 'content-hash',
             directory,
             logicalName,
@@ -253,18 +274,22 @@ export class WebAppBrandingResourceHandler
             ...(fallbackDestination === undefined
               ? {}
               : { fallbackDestination }),
-            publicPath: {
-              publicDirectory,
-              publicBasePath: webTarget.publicBasePath,
-            },
-          }
-        : {
-            mode: 'stable',
-            publicPath: {
-              publicDirectory,
-              publicBasePath: webTarget.publicBasePath,
-            },
+            publicPath,
           };
+      }
+      return {
+        mode: 'stable',
+        publicPath,
+        ...(naming.strategy === 'query'
+          ? {
+              queryContentHash: {
+                parameter: 'v' as const,
+                hashLength,
+              },
+            }
+          : {}),
+      };
+    };
 
     const iconRecipe = (
       size: number,
@@ -322,26 +347,7 @@ export class WebAppBrandingResourceHandler
         target: target.id,
         operation: 'render-image',
         ownership: 'generated',
-        publication:
-          resource.naming.strategy === 'content-hash'
-            ? {
-                mode: 'content-hash',
-                directory: outputDirectory,
-                logicalName,
-                extension: 'png',
-                hashLength,
-                publicPath: {
-                  publicDirectory,
-                  publicBasePath: webTarget.publicBasePath,
-                },
-              }
-            : {
-                mode: 'stable',
-                publicPath: {
-                  publicDirectory,
-                  publicBasePath: webTarget.publicBasePath,
-                },
-        },
+        publication: publication(outputDirectory, logicalName, 'png'),
         dependsOn: [],
         sourceDependencies: prepared.sourceDependencies,
         destination: path.join(outputDirectory, `${logicalName}.png`),
@@ -407,41 +413,22 @@ export class WebAppBrandingResourceHandler
       ).recipe,
     }));
     const icoId = `${resourceId}:${target.id}:favicon-ico`;
-    artifacts.push({
+    const icoArtifact: RenderImageArtifact = {
       id: icoId,
       resourceId,
       resourceType: 'web-app-branding',
       target: target.id,
       operation: 'render-image',
       ownership: 'generated',
-      publication:
-        resource.naming.strategy === 'content-hash'
-          ? {
-              mode: 'content-hash',
-              directory: outputDirectory,
-              logicalName: 'favicon',
-              extension: 'ico',
-              hashLength,
-              ...(resource.naming.fallbackFavicon === undefined
-                ? {}
-                : {
-                    fallbackDestination: inside(
-                      target.root,
-                      resource.naming.fallbackFavicon,
-                    ),
-                  }),
-              publicPath: {
-                publicDirectory,
-                publicBasePath: webTarget.publicBasePath,
-              },
-            }
-          : {
-              mode: 'stable',
-              publicPath: {
-                publicDirectory,
-                publicBasePath: webTarget.publicBasePath,
-              },
-            },
+      publication: publication(
+        outputDirectory,
+        'favicon',
+        'ico',
+        naming.strategy === 'filename' &&
+          naming.fallbackFavicon !== undefined
+          ? inside(target.root, naming.fallbackFavicon)
+          : undefined,
+      ),
       dependsOn: [],
       sourceDependencies: [
         foreground.absolutePath,
@@ -453,7 +440,8 @@ export class WebAppBrandingResourceHandler
       height: Math.max(...icoSizes),
       format: 'ico',
       recipe: { kind: 'ico', images: icoImages },
-    });
+    };
+    artifacts.push(icoArtifact);
 
     let socialId: string | undefined;
     if (social !== undefined && resource.socialPreview !== undefined) {
@@ -562,30 +550,83 @@ export class WebAppBrandingResourceHandler
     );
     const maskableIcons = maskableIconEntries.map((entry) => entry.manifest);
 
+    const usage: PlannedUsageDescriptorV1[] = [];
+    const siteUrl = resource.seo?.siteUrl;
+    usage.push({
+      kind: 'web.html-link',
+      version: 1,
+      targetId: target.id,
+      artifactIds: [icoId],
+      payload: {
+        rel: 'icon',
+        sizes: 'any',
+        href: absoluteUrl(siteUrl, outputReference(icoId)),
+      },
+    });
+    for (const size of faviconSizes) {
+      const icon = imageByLogicalName.get(`favicon:${size}`);
+      if (icon !== undefined) {
+        usage.push({
+          kind: 'web.html-link',
+          version: 1,
+          targetId: target.id,
+          artifactIds: [icon.id],
+          payload: {
+            rel: 'icon',
+            type: 'image/png',
+            sizes: `${size}x${size}`,
+            href: absoluteUrl(siteUrl, outputReference(icon.id)),
+          },
+        });
+      }
+    }
+    if (appleTouchIcon !== undefined) {
+      usage.push({
+        kind: 'web.html-link',
+        version: 1,
+        targetId: target.id,
+        artifactIds: [appleTouchIcon.id],
+        payload: {
+          rel: 'apple-touch-icon',
+          sizes: `${appleTouchIcon.width}x${appleTouchIcon.height}`,
+          href: absoluteUrl(siteUrl, outputReference(appleTouchIcon.id)),
+        },
+      });
+    }
+
     let manifestArtifactId: string | undefined;
-    let manifestResultId: string | undefined;
     if (resource.output.manifest !== undefined) {
       const manifestDestination = inside(target.root, resource.output.manifest);
-      const manifestId = `${resourceId}:${target.id}:manifest-integration`;
+      const manifestId = `${resourceId}:${target.id}:manifest`;
       manifestArtifactId = manifestId;
-      manifestResultId = `${manifestId}:published`;
       artifacts.push({
         id: manifestId,
         resourceId,
         resourceType: 'web-app-branding',
         target: target.id,
-        operation: 'integrate-project',
-        ownership: 'project-integration',
+        operation: 'write-text',
+        ownership: 'generated',
         dependsOn: [...applicationIconEntries, ...maskableIconEntries].map(
           (entry) => entry.artifactId,
         ),
         sourceDependencies: [],
         destination: manifestDestination,
         presetVersion: `${preset.id}:${preset.version}`,
-        integration: {
-          adapter: 'web-app-manifest',
-          stateKey: `${resourceId}-web-manifest`,
-          manifest: {
+        role: 'web.manifest',
+        mediaType: 'application/manifest+json',
+        publication: publication(
+          path.dirname(manifestDestination),
+          path.basename(manifestDestination, path.extname(manifestDestination)),
+          path.extname(manifestDestination).replace(/^\./u, '') || 'json',
+          naming.strategy === 'filename' &&
+            naming.fallbackManifest !== undefined
+            ? inside(target.root, naming.fallbackManifest)
+            : undefined,
+        ),
+        encoding: 'utf8',
+        content: {
+          kind: 'json-template',
+          value: {
             name: resource.displayName,
             short_name: resource.shortName,
             icons: [...applicationIcons, ...maskableIcons],
@@ -593,35 +634,34 @@ export class WebAppBrandingResourceHandler
             background_color: resource.manifest.backgroundColor,
             display: resource.manifest.display,
           },
-          publishedCopy: {
-            resultId: manifestResultId,
-            destination: manifestDestination,
-            publication: publication(
-              publicDirectory,
-              'manifest',
-              'json',
-              resource.naming.fallbackManifest === undefined
-                ? undefined
-                : inside(target.root, resource.naming.fallbackManifest),
-            ),
-          },
         },
-      } satisfies IntegrateProjectArtifact);
+      });
+      usage.push({
+        kind: 'web.html-link',
+        version: 1,
+        targetId: target.id,
+        artifactIds: [manifestId],
+        payload: {
+          rel: 'manifest',
+          type: 'application/manifest+json',
+          href: absoluteUrl(siteUrl, outputReference(manifestId)),
+        },
+      });
     }
 
-    if (resource.output.document !== undefined) {
-      const seo = resource.seo;
-      const elements: HtmlHeadElement[] = [];
-      if (seo?.title !== undefined) {
+    const seo = resource.seo;
+    if (seo !== undefined) {
+      const elements: PlannedJsonValue[] = [];
+      if (seo.title !== undefined) {
         elements.push({ element: 'title', text: seo.title });
       }
-      if (seo?.description !== undefined) {
+      if (seo.description !== undefined) {
         elements.push({
           element: 'meta',
           attributes: { name: 'description', content: seo.description },
         });
       }
-      if (seo?.canonicalPath !== undefined) {
+      if (seo.canonicalPath !== undefined) {
         elements.push({
           element: 'link',
           attributes: {
@@ -633,13 +673,13 @@ export class WebAppBrandingResourceHandler
           },
         });
       }
-      if (seo?.robots !== undefined) {
+      if (seo.robots !== undefined) {
         elements.push({
           element: 'meta',
           attributes: { name: 'robots', content: seo.robots },
         });
       }
-      if (seo?.openGraph !== undefined) {
+      if (seo.openGraph !== undefined) {
         const openGraphDescription =
           seo.openGraph.description ?? seo.description;
         const openGraphUrl = seo.openGraph.url ?? seo.canonicalPath;
@@ -710,7 +750,7 @@ export class WebAppBrandingResourceHandler
           }
         }
       }
-      if (seo?.twitter !== undefined) {
+      if (seo.twitter !== undefined) {
         elements.push(
           {
             element: 'meta',
@@ -754,13 +794,13 @@ export class WebAppBrandingResourceHandler
           content: resource.manifest.themeColor ?? resource.brandColor,
         },
       });
-      if (seo?.colorScheme !== undefined) {
+      if (seo.colorScheme !== undefined) {
         elements.push({
           element: 'meta',
           attributes: { name: 'color-scheme', content: seo.colorScheme },
         });
       }
-      if (seo?.includeIcons === true) {
+      if (seo.includeIcons === true) {
         elements.push({
           element: 'link',
           attributes: {
@@ -797,68 +837,39 @@ export class WebAppBrandingResourceHandler
           });
         }
       }
-      if (seo?.includeManifest === true && manifestResultId !== undefined) {
+      if (seo.includeManifest === true && manifestArtifactId !== undefined) {
         elements.push({
           element: 'link',
           attributes: {
             rel: 'manifest',
             href: absoluteUrl(
               seo.siteUrl,
-              outputReference(manifestResultId),
+              outputReference(manifestArtifactId),
             ),
           },
         });
       }
-      const referenceIds = new Set<string>();
-      const collectReference = (artifactId: string): void => {
-        referenceIds.add(
-          artifactId === manifestResultId && manifestArtifactId !== undefined
-            ? manifestArtifactId
-            : artifactId,
-        );
-      };
-      const collect = (value: IntegrationValue): void => {
-        if (typeof value === 'string') {
-          return;
-        }
-        if (value.kind === 'artifact-output') {
-          collectReference(value.artifactId);
-        } else {
-          for (const part of value.parts) {
-            if (typeof part !== 'string') {
-              collectReference(part.artifactId);
-            }
-          }
-        }
-      };
-      for (const element of elements) {
-        if (element.text !== undefined) {
-          collect(element.text);
-        }
-        Object.values(element.attributes ?? {}).forEach(collect);
-      }
-      artifacts.push({
-        id: `${resourceId}:${target.id}:html-head-integration`,
-        resourceId,
-        resourceType: 'web-app-branding',
-        target: target.id,
-        operation: 'integrate-project',
-        ownership: 'project-integration',
-        dependsOn: [...referenceIds].sort(compareCodePoints),
-        sourceDependencies: [],
-        destination: inside(target.root, resource.output.document),
-        presetVersion: `${preset.id}:${preset.version}`,
-        integration: {
-          adapter: 'html-head',
-          stateKey: `${resourceId}-html-head`,
-          elements,
-        },
+      const artifactIds = [
+        icoId,
+        ...faviconSizes.flatMap((size) => {
+          const icon = imageByLogicalName.get(`favicon:${size}`);
+          return icon === undefined ? [] : [icon.id];
+        }),
+        ...(appleTouchIcon === undefined ? [] : [appleTouchIcon.id]),
+        ...(socialId === undefined ? [] : [socialId]),
+        ...(manifestArtifactId === undefined ? [] : [manifestArtifactId]),
+      ];
+      usage.push({
+        kind: 'web.head-metadata',
+        version: 1,
+        targetId: target.id,
+        artifactIds,
+        payload: { elements },
       });
     }
 
-    if (resource.staticWebApp !== undefined) {
-      const routes = resource.staticWebApp.integrateCacheHeaders
-        ? [
+    if (resource.staticHost?.includeCacheGuidance === true) {
+      const routes: PlannedJsonValue[] = [
             {
               route: `/${path
                 .relative(publicDirectory, outputDirectory)
@@ -882,26 +893,22 @@ export class WebAppBrandingResourceHandler
               route: '/favicon.ico',
               headers: { 'Cache-Control': 'no-cache' },
             },
-          ]
-        : [];
-      artifacts.push({
-        id: `${resourceId}:${target.id}:static-web-app-integration`,
-        resourceId,
-        resourceType: 'web-app-branding',
-        target: target.id,
-        operation: 'integrate-project',
-        ownership: 'project-integration',
-        dependsOn: [],
-        sourceDependencies: [],
-        destination: inside(target.root, resource.staticWebApp.path),
-        presetVersion: `${preset.id}:${preset.version}`,
-        integration: {
-          adapter: 'static-web-app-config',
-          stateKey: `${resourceId}-static-web-app`,
-          routes,
-        },
+          ];
+      usage.push({
+        kind: 'web.static-host-cache',
+        version: 1,
+        targetId: target.id,
+        artifactIds: artifacts.map((artifact) => artifact.id),
+        payload: { routes },
       });
     }
+
+    const carrierIndex = artifacts.findIndex((artifact) => artifact.id === icoId);
+    const carrier = artifacts[carrierIndex];
+    if (carrier === undefined) {
+      throw new LoomError({ code: 'LOOM_INTERNAL', message: 'Web descriptor carrier is missing.' });
+    }
+    artifacts[carrierIndex] = { ...carrier, usage };
 
     return artifacts;
   }

@@ -1,13 +1,27 @@
 # Assetloom
 
-Assetloom generates deterministic native application resources for Android and
-iOS from SVG, PNG, or WebP artwork. It supports native projects and bare React
-Native applications; Expo is outside its scope.
+Assetloom is a deterministic asset compiler and whole-file publisher for
+Android, iOS, React Native, web, and ordinary directory outputs. Native image
+generation accepts SVG, PNG, and WebP artwork; Expo is outside its scope.
 
 Generated output includes launcher and app icons, Android notification
-resources, splash screens, Apple asset catalogs, and Xcode resource integration.
+resources, splash screens, and Apple asset catalogs. It returns usage descriptors
+for caller-owned Android, iOS, and web setup; it never edits application files.
 Generation is explicit, safe to repeat, and writes nothing when content is
 unchanged.
+
+The authoritative Node boundary is `generateVersioned`; the authoritative
+machine CLI boundary is the same direct `GenerationResultV1` value:
+
+```sh
+assetloom --json generate -c assetloom.json \
+  --result-file ci/assets.json
+```
+
+The result contains every current artifact, including unchanged outputs,
+stale owned outputs removed during the run, typed usage descriptors, stable
+diagnostics, and the full SHA-256 of each final published file. Result files
+are guarded beneath `.assetloom/results`.
 
 ## Use in a React Native application
 
@@ -28,13 +42,11 @@ enables both native projects and generates modern app icons:
   "targets": {
     "android": {
       "enabled": true,
-      "resourceDirectory": "./android/app/src/main/res",
-      "manifestPath": "./android/app/src/main/AndroidManifest.xml"
+      "resourceDirectory": "./android/app/src/main/res"
     },
     "ios": {
       "enabled": true,
       "projectDirectory": "./ios/YourApp",
-      "projectFile": "./ios/YourApp.xcodeproj/project.pbxproj",
       "assetCatalogDirectory": "./ios/YourApp/Images.xcassets"
     }
   },
@@ -87,6 +99,10 @@ Install CocoaPods through the application's normal `Gemfile` and `Podfile`
 before the first iOS build. Do not hide generation in Gradle or Xcode build
 phases.
 
+After generation, the caller must reference Android resources from its own
+manifest/theme and add iOS catalogs or storyboards to its own Xcode project.
+Assetloom publishes complete resource files only.
+
 ## White-label applications
 
 Assetloom is well suited to white-label application frameworks where one React
@@ -132,20 +148,33 @@ dimensions, densities, appearances, and platform-context previews. Give each
 brand a distinct `metadata.name` and generate every configuration to retain an
 independent visual snapshot. See the [HTML reporting guide](docs/reporting.md).
 
-Keep generated resource paths and `.assetloom/` locally Git-ignored. Assetloom
-tracks ownership in its manifest, avoids unchanged writes, and never cleans
+Configure the consuming repository to ignore generated resource paths and
+`.assetloom/` when appropriate. Assetloom never edits repository ignore files.
+It tracks ownership in its manifest, avoids unchanged writes, and never cleans
 files it does not own.
 
-Rendered assets remain cached across brand switches. Reuse is based on the
-merged configuration's effective source bytes and render settings, not the
-configuration filenames or resource names; `assetloom clean` leaves this cache
-intact.
+Rendered assets remain cached across brand switches. Reuse is based on source
+bytes, path-free effective recipes, encoding settings, and compatible renderer
+versions—not unrelated configuration, destinations, public URLs, source paths,
+configuration filenames, or resource names; `assetloom clean` leaves this
+cache intact. Web browser cache busting separately uses final encoded-byte
+SHA-256 with `none`, `filename`, or `query` policy.
 
 See the [package guide](packages/assetloom/README.md) and
 [configuration reference](docs/configuration.md) for splash screens,
 notification icons, Icon Composer packages, and all CLI options.
+Breaking changes from the former application-mutation surface are covered in
+the [publish-and-describe migration guide](docs/migration-publish-and-describe.md).
 
 ## Run this repository's demo
+
+Publish the demo assets, persist the result catalog, and validate the
+caller-owned native registrations:
+
+```sh
+yarn demo:assets
+yarn demo:assets:verify
+```
 
 Start Metro in one terminal:
 
@@ -166,10 +195,23 @@ On a fresh macOS checkout, run `bundle install` and
 
 ## Workspace
 
-- `packages/assetloom` — the ESM package and CLI.
+- `packages/assetloom-core` — resource-neutral contracts, orchestration, state,
+  ownership, publication, diagnostics, and result types.
+- `packages/assetloom-images` — Sharp-backed generic image inspection and
+  transformation contracts; depends only on core.
+- `packages/assetloom-native` — native presets, validators, semantic roles,
+  layouts, and typed usage descriptors; depends on core and images.
+- `packages/assetloom-web` — web presets, public paths, final-byte cache
+  policies, and typed usage descriptors; depends on core and images.
+- `packages/assetloom` — compatibility facade, default composition, Commander
+  CLI, human/JSON output, schema, and executable; depends on all four focused
+  packages.
 - `apps/demo-react-native` — a bare React Native example.
 - `fixtures` — native verification projects.
 - `docs` — configuration, architecture, and release status.
+
+The graph is acyclic. Packages use public exported roots only; CLI commands
+exist only in the facade.
 
 ## Development
 

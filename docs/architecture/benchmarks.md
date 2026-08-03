@@ -9,8 +9,8 @@ Environment:
 - Node.js 26.3.0
 - Sharp 0.35.3
 
-The bundled benchmark creates a temporary Android project, plans 24 app-icon
-and integration tasks, renders a cold run, then repeats with unchanged inputs
+The bundled benchmark creates a temporary Android output fixture, plans 24
+complete app-icon resource tasks, renders a cold run, then repeats with unchanged inputs
 and a warm content cache.
 
 ```text

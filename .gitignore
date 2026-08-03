@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 # Assetloom runtime state and generated package output
 **/.assetloom/
 packages/assetloom/lib/
+packages/assetloom-*/lib/

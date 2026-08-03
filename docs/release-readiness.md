@@ -1,10 +1,14 @@
 # Release-readiness report
 
-Date: 2026-07-29.
+Original platform evidence date: 2026-07-29. Publish-and-describe migration
+update: 2026-08-02.
 
 Overall status: pre-release. The native Android evidence remains green and both
-iOS native projects now build locally on macOS. A green hosted macOS workflow
-and the release-record checks are still required before publishing.
+iOS native projects built locally on macOS in the recorded environment. The
+current local migration verification is recorded in
+[`specs/005-cli-docs-package-verification/verification.md`](../specs/005-cli-docs-package-verification/verification.md).
+A green hosted macOS workflow and release-record checks are still required
+before publishing.
 
 ## Completed evidence
 
@@ -12,7 +16,7 @@ and the release-record checks are still required before publishing.
 - The packed tarball installs in an empty consumer and its CLI executes.
 - All stable public error codes use the `LOOM_` prefix.
 - Ordered merge, provenance, null deletion, array replacement, target
-  rejection, conflict refusal, safe cleanup, local ignore preservation,
+  rejection, conflict refusal, safe cleanup, repository sentinel preservation,
   passthrough, determinism, and second-run behavior have automated tests.
 - The Android native fixture compiles generated resources with Gradle/AAPT2.
 - The bare React Native Android demo completes `assembleDebug`.
@@ -22,13 +26,13 @@ and the release-record checks are still required before publishing.
   `Gemfile.lock`, Xcode builds the bare React Native workspace for the same
   destination and the app launches on an iPhone 17 Pro simulator running iOS
   26.2.
-- Xcode accepts the generated Light, Dark, and Tinted app-icon appearances,
-  launch storyboard, light/dark launch assets, PBX membership, and deployment
-  targets. The generated images were also inspected directly and in Simulator.
+- A caller-configured Xcode fixture accepts the generated Light, Dark, and
+  Tinted app-icon appearances, launch storyboard, and light/dark launch assets.
+  The generated images were also inspected directly and in Simulator.
 - A genuine Icon Composer `.icon` directory was passed through a clean generated
-  fixture and compiled by Xcode 26.2. Assetloom records these PBX resources as
-  `folder.iconcomposer.icon`; the prior generic-folder type was fixed and
-  regression-tested.
+  fixture and compiled by Xcode 26.2 after caller-owned target registration.
+  AssetLoom publishes the complete `.icon` directory but does not edit the
+  Xcode project.
 - Fixture generation reports 14 unchanged files and zero writes on an unchanged
   second run. Demo generation reports 56 unchanged files and zero writes.
 - Per-configuration HTML reporting embeds source artwork and all generated
@@ -36,9 +40,9 @@ and the release-record checks are still required before publishing.
   sources and 56 outputs with zero integrity issues; its Android/iOS filters
   and layout were browser-reviewed with no console or network errors. An
   unchanged second report performs no write.
-- Root `git status` is identical before and after generation. Generated native
-  resources, `.assetloom/`, CocoaPods, Xcode workspaces, and build products are
-  ignored without replacing existing ignore content.
+- Root `git status` is identical before and after generation when output/state
+  paths are already covered by caller-owned ignore policy. Repository ignore
+  files remain byte-identical; AssetLoom never modifies them.
 - The Darwin arm64 benchmark with Node 26.3.0 completed 24 tasks in 82.26 ms
   cold and 8.14 ms warm, with 24 cold writes and zero warm writes.
 - Root lint, package and demo typechecking, 18 tests, build, packed-package smoke

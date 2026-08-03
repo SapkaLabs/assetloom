@@ -24,7 +24,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node ./scripts/clean-build.mjs && tsc -p tsconfig.build.json",
     "prepack": "yarn build",
     "lint": "eslint src tests",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -37,6 +37,10 @@
     "@babel/parser": "^7.29.7",
     "@babel/traverse": "^7.29.7",
     "@babel/types": "^7.29.7",
+    "@sapkalabs/assetloom-core": "workspace:^",
+    "@sapkalabs/assetloom-images": "workspace:^",
+    "@sapkalabs/assetloom-native": "workspace:^",
+    "@sapkalabs/assetloom-web": "workspace:^",
     "@svgr/core": "^8.1.0",
     "@svgr/plugin-jsx": "^8.1.0",
     "@svgr/plugin-prettier": "^8.1.0",

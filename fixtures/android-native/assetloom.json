@@ -6,8 +6,7 @@
   "targets": {
     "android": {
       "enabled": true,
-      "resourceDirectory": "./app/src/main/res",
-      "manifestPath": "./app/src/main/AndroidManifest.xml"
+      "resourceDirectory": "./app/src/main/res"
     }
   },
   "resources": {

@@ -2,9 +2,27 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfiguration } from '../src/config/load.js';
+import { loadConfiguration, loadVersionedConfiguration } from '../src/config/load.js';
 
 describe('configuration loading', () => {
+  it.each([
+    ['manifestPath', { targets: { android: { enabled: true, resourceDirectory: 'android/res', manifestPath: 'AndroidManifest.xml' } }, resources: {} }],
+    ['projectFile', { targets: { ios: { enabled: true, projectDirectory: 'ios/App', assetCatalogDirectory: 'ios/App/Images.xcassets', projectFile: 'App.xcodeproj/project.pbxproj' } }, resources: {} }],
+    ['document', { targets: {}, resources: { brand: { type: 'web-app-branding', output: { document: 'index.html' } } } }],
+    ['staticWebApp', { targets: {}, resources: { brand: { type: 'web-app-branding', staticWebApp: { path: 'staticwebapp.config.json' } } } }],
+    ['stable naming', { targets: {}, resources: { brand: { type: 'web-app-branding', naming: { strategy: 'stable' } } } }],
+    ['content-hash naming', { targets: {}, resources: { brand: { type: 'web-app-branding', naming: { strategy: 'content-hash' } } } }],
+  ])('reports a stable migration diagnostic for removed %s configuration', async (_name, fragment) => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-config-migration-'));
+    await writeFile(path.join(directory, 'invalid.json'), JSON.stringify({
+      schemaVersion: 2,
+      project: { root: '.' },
+      ...fragment,
+    }));
+    await expect(loadVersionedConfiguration(['invalid.json'], { cwd: directory })).rejects.toMatchObject({
+      code: 'LOOM_CFG_MIGRATION',
+    });
+  });
   it('loads ordered native target configuration with provenance', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-config-'));
     await writeFile(
@@ -16,7 +34,6 @@ describe('configuration loading', () => {
           android: {
             enabled: true,
             resourceDirectory: 'android/app/src/main/res',
-            manifestPath: 'android/app/src/main/AndroidManifest.xml',
           },
         },
         resources: {
@@ -83,7 +100,6 @@ describe('configuration loading', () => {
           android: {
             enabled: true,
             resourceDirectory: 'android/app/src/main/res',
-            manifestPath: 'android/app/src/main/AndroidManifest.xml',
           },
         },
         resources: {

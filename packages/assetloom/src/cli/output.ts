@@ -1,5 +1,9 @@
 import path from 'node:path';
 import type { LoomError } from '../domain/errors.js';
+import {
+  stableGenerationResultJson,
+  type GenerationResultV1,
+} from '../domain/generation-result.js';
 
 export interface OutputOptions {
   readonly json: boolean;
@@ -75,4 +79,18 @@ export function printResult(
   process.stdout.write(
     options.json ? `${JSON.stringify(value, null, 2)}\n` : `${human}\n`,
   );
+}
+
+export function printGenerationResult(
+  result: GenerationResultV1,
+  options: Pick<OutputOptions, 'json'>,
+  human: string,
+): void {
+  process.stdout.write(
+    options.json ? stableGenerationResultJson(result) : `${human}\n`,
+  );
+}
+
+export function printInformation(message: string): void {
+  process.stderr.write(`${message}\n`);
 }

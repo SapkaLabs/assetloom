@@ -1,7 +1,5 @@
-import type {
-  CatalogPlannedArtifact,
-  IntegrateProjectArtifact,
-} from '../../domain/catalog/planning.js';
+import type { CatalogPlannedArtifact, PlannedJsonValue } from '../../domain/catalog/planning.js';
+import type { JsonSafeValue, UsageDescriptorV1 } from '../../domain/generation-result.js';
 import { LoomError } from '../../domain/errors.js';
 import { compareCodePoints } from '../../domain/ordering.js';
 import type { MaterializedOwnedOutput } from '../../storage/owned-output-lifecycle.js';
@@ -12,21 +10,16 @@ import type {
   CatalogPublicationResolver,
   ResolvedCatalogArtifactOutput,
 } from './contracts.js';
-import type {
-  PreparedIntegrationPublication,
-  ProjectIntegrationSession,
-} from './project-integration-lifecycle.js';
 
 export interface PreparedCatalogExecution {
-  readonly integrations: PreparedIntegrationPublication;
   readonly outputs: CatalogArtifactOutputMap;
   readonly ownedOutputs: readonly MaterializedOwnedOutput[];
   readonly resolvedOutputs: readonly ResolvedCatalogArtifactOutput[];
+  readonly usage: readonly UsageDescriptorV1[];
 }
 
 export interface CatalogExecutorOptions {
   readonly cache: CatalogContentCache;
-  readonly integrations: ProjectIntegrationSession;
   readonly materializers: CatalogMaterializerRegistry;
   readonly normalizedConfiguration: string;
   readonly projectRoot: string;
@@ -116,13 +109,22 @@ function orderedArtifacts(
   return result;
 }
 
-function integrationArtifacts(
-  artifacts: readonly CatalogPlannedArtifact[],
-): readonly IntegrateProjectArtifact[] {
-  return artifacts.filter(
-    (artifact): artifact is IntegrateProjectArtifact =>
-      artifact.operation === 'integrate-project',
-  );
+function mediaType(destination: string): string | undefined {
+  const extension = destination.split('.').pop()?.toLocaleLowerCase('en-US');
+  return (
+    {
+      css: 'text/css',
+      ico: 'image/x-icon',
+      jpeg: 'image/jpeg',
+      jpg: 'image/jpeg',
+      json: 'application/json',
+      png: 'image/png',
+      svg: 'image/svg+xml',
+      webp: 'image/webp',
+      woff: 'font/woff',
+      woff2: 'font/woff2',
+    } as const
+  )[extension ?? ''];
 }
 
 export class CatalogExecutor {
@@ -137,45 +139,8 @@ export class CatalogExecutor {
   ): Promise<PreparedCatalogExecution> {
     const outputs = new CatalogArtifactOutputMap();
     const ownedOutputs: MaterializedOwnedOutput[] = [];
-    const integrationDestinations = new Set(
-      integrationArtifacts(artifacts).map((artifact) =>
-        artifact.destination.toLocaleLowerCase('en-US'),
-      ),
-    );
 
     for (const artifact of orderedArtifacts(artifacts)) {
-      if (artifact.operation === 'integrate-project') {
-        const prepared = await this.#options.integrations.apply(
-          artifact,
-          outputs,
-        );
-        const publishedCopy =
-          artifact.integration.adapter === 'web-app-manifest'
-            ? artifact.integration.publishedCopy
-            : undefined;
-        if (publishedCopy !== undefined) {
-          const publication = this.#options.publications.resolveIntegrationResult(
-            artifact,
-            publishedCopy,
-            prepared.content,
-          );
-          outputs.add(publication.output);
-          const authoredDestinationKey = artifact.destination.toLocaleLowerCase('en-US');
-          this.#appendOwnedOutputs(
-            artifact.target,
-            publication.output.artifactId,
-            publication.output.content,
-            publication.ownedDestinations.filter(
-              (destination) =>
-                destination.toLocaleLowerCase('en-US') !== authoredDestinationKey,
-            ),
-            ownedOutputs,
-            integrationDestinations,
-          );
-        }
-        continue;
-      }
-
       const materialized = await this.#options.materializers.materialize(
         artifact,
         {
@@ -191,47 +156,115 @@ export class CatalogExecutor {
       );
       outputs.add(publication.output);
       this.#appendOwnedOutputs(
-        artifact.target,
-        artifact.id,
-        publication.output.content,
+        artifact,
+        publication.output,
         publication.ownedDestinations,
         ownedOutputs,
-        integrationDestinations,
       );
     }
 
     return {
-      integrations: this.#options.integrations.finalize(),
       outputs,
       ownedOutputs,
       resolvedOutputs: outputs.values(),
+      usage: artifacts.flatMap((artifact) =>
+        (artifact.usage ?? []).map((descriptor) => ({
+          ...descriptor,
+          artifactIds: [...new Set(descriptor.artifactIds)].sort(compareCodePoints),
+          payload: this.#resolveUsageValue(descriptor.payload, outputs),
+        })),
+      ),
     };
   }
 
+  #resolveUsageValue(
+    value: PlannedJsonValue,
+    outputs: CatalogArtifactOutputMap,
+  ): JsonSafeValue {
+    if (Array.isArray(value)) {
+      return (value as readonly PlannedJsonValue[]).map((item) =>
+        this.#resolveUsageValue(item, outputs),
+      );
+    }
+    if (value !== null && typeof value === 'object') {
+      const record = value as { readonly kind?: string };
+      if (record.kind === 'artifact-output') {
+        const reference = value as Extract<PlannedJsonValue, { readonly kind: 'artifact-output' }>;
+        const resolved = outputs.resolve(reference);
+        if (resolved instanceof Uint8Array) {
+          throw new LoomError({
+            code: 'LOOM_PLAN_INVALID',
+            message: 'Usage descriptors cannot embed artifact bytes.',
+            context: { artifactId: reference.artifactId },
+          });
+        }
+        return resolved;
+      }
+      if (record.kind === 'interpolated') {
+        const interpolated = value as Extract<PlannedJsonValue, { readonly kind: 'interpolated' }>;
+        return interpolated.parts
+          .map((part) => typeof part === 'string' ? part : String(outputs.resolve(part)))
+          .join('');
+      }
+      return Object.fromEntries(
+        Object.entries(value as Readonly<Record<string, PlannedJsonValue>>)
+          .sort(([left], [right]) => compareCodePoints(left, right))
+          .map(([key, item]) => [key, this.#resolveUsageValue(item, outputs)]),
+      );
+    }
+    return value;
+  }
+
   #appendOwnedOutputs(
-    target: string,
-    artifactId: string,
-    content: Uint8Array,
+    artifact: CatalogPlannedArtifact,
+    resolved: ResolvedCatalogArtifactOutput,
     destinations: readonly string[],
     outputs: MaterializedOwnedOutput[],
-    integrationDestinations: ReadonlySet<string>,
   ): void {
     const existing = new Set(
       outputs.map((output) =>
         output.destination.toLocaleLowerCase('en-US'),
       ),
     );
-    for (const destination of destinations) {
+    for (const [index, destination] of destinations.entries()) {
       const key = destination.toLocaleLowerCase('en-US');
-      if (existing.has(key) || integrationDestinations.has(key)) {
+      if (existing.has(key)) {
         throw new LoomError({
           code: 'LOOM_PLAN_COLLISION',
           message: 'Catalog publications resolve to the same destination.',
-          context: { destination, taskId: artifactId },
+          context: { destination, taskId: artifact.id },
         });
       }
       existing.add(key);
-      outputs.push({ artifactId, content, destination, target });
+      const primary = index === 0;
+      const resolvedMediaType = artifact.mediaType ?? mediaType(destination);
+      outputs.push({
+        artifactId: primary
+          ? resolved.artifactId
+          : `${resolved.artifactId}:fallback-${index}`,
+        resourceId: artifact.resourceId,
+        role:
+          artifact.role ??
+          `${artifact.resourceType}.${artifact.operation}${primary ? '' : '.fallback'}`,
+        content: resolved.content,
+        destination,
+        target: artifact.target,
+        ...(primary && artifact.outputRootId !== undefined
+          ? { outputRootId: artifact.outputRootId }
+          : {}),
+        ...(primary && artifact.relativePath !== undefined
+          ? { relativePath: artifact.relativePath }
+          : {}),
+        ...(primary && resolved.publicPath !== undefined
+          ? { publicPath: resolved.publicPath }
+          : {}),
+        ...(resolvedMediaType === undefined
+          ? {}
+          : { mediaType: resolvedMediaType }),
+        ...(resolved.width === undefined ? {} : { width: resolved.width }),
+        ...(resolved.height === undefined ? {} : { height: resolved.height }),
+        hashToken: resolved.hashToken,
+      });
     }
   }
 }

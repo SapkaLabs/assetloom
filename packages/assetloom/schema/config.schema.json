@@ -722,7 +722,6 @@
         "output",
         "faviconSizes",
         "applicationIconSizes",
-        "naming",
         "manifest"
       ],
       "properties": {
@@ -781,9 +780,6 @@
             },
             "manifest": {
               "$ref": "#/$defs/path"
-            },
-            "document": {
-              "$ref": "#/$defs/path"
             }
           }
         },
@@ -814,8 +810,8 @@
         "seo": {
           "$ref": "#/$defs/webBrandSeo"
         },
-        "staticWebApp": {
-          "$ref": "#/$defs/staticWebAppIntegration"
+        "staticHost": {
+          "$ref": "#/$defs/webStaticHostGuidance"
         },
         "socialPreview": {
           "type": "object",
@@ -890,45 +886,44 @@
       }
     },
     "webBrandNaming": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "strategy"
-      ],
-      "properties": {
-        "strategy": {
-          "enum": [
-            "content-hash",
-            "stable"
-          ]
-        },
-        "hashLength": {
-          "type": "integer",
-          "minimum": 8,
-          "maximum": 64
-        },
-        "fallbackFavicon": {
-          "$ref": "#/$defs/path"
-        },
-        "fallbackManifest": {
-          "$ref": "#/$defs/path"
-        }
-      },
-      "if": {
-        "properties": {
-          "strategy": {
-            "const": "content-hash"
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "const": "none" }
           }
         },
-        "required": [
-          "strategy"
-        ]
-      },
-      "then": {
-        "required": [
-          "hashLength"
-        ]
-      }
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "const": "filename" },
+            "hashLength": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 64
+            },
+            "fallbackFavicon": { "$ref": "#/$defs/path" },
+            "fallbackManifest": { "$ref": "#/$defs/path" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "const": "query" },
+            "hashLength": {
+              "type": "integer",
+              "minimum": 8,
+              "maximum": 64
+            }
+          }
+        }
+      ]
     },
     "webBrandManifest": {
       "type": "object",
@@ -1044,18 +1039,14 @@
         }
       }
     },
-    "staticWebAppIntegration": {
+    "webStaticHostGuidance": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "path",
-        "integrateCacheHeaders"
+        "includeCacheGuidance"
       ],
       "properties": {
-        "path": {
-          "$ref": "#/$defs/path"
-        },
-        "integrateCacheHeaders": {
+        "includeCacheGuidance": {
           "type": "boolean"
         }
       }
@@ -1217,17 +1208,13 @@
       "additionalProperties": false,
       "required": [
         "enabled",
-        "resourceDirectory",
-        "manifestPath"
+        "resourceDirectory"
       ],
       "properties": {
         "enabled": {
           "type": "boolean"
         },
         "resourceDirectory": {
-          "$ref": "#/$defs/path"
-        },
-        "manifestPath": {
           "$ref": "#/$defs/path"
         }
       }
@@ -1238,7 +1225,6 @@
       "required": [
         "enabled",
         "projectDirectory",
-        "projectFile",
         "assetCatalogDirectory"
       ],
       "properties": {
@@ -1246,9 +1232,6 @@
           "type": "boolean"
         },
         "projectDirectory": {
-          "$ref": "#/$defs/path"
-        },
-        "projectFile": {
           "$ref": "#/$defs/path"
         },
         "assetCatalogDirectory": {

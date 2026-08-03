@@ -1,7 +1,6 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { NativeTaskExecutor, PreparedNativeExecution } from '../../application/execution/native-execution.js';
-import type { ProjectFileGateway } from '../../application/execution/contracts.js';
 import type {
   GenerationTask,
   LoadedConfiguration,
@@ -65,50 +64,34 @@ async function copyOutputs(
 }
 
 export class DefaultNativeTaskExecutor implements NativeTaskExecutor {
-  readonly #files: ProjectFileGateway;
   readonly #renderer: SharpRenderer;
 
-  constructor(renderer: SharpRenderer, files: ProjectFileGateway) {
+  constructor(renderer: SharpRenderer) {
     this.#renderer = renderer;
-    this.#files = files;
   }
 
   async prepare(
     tasks: readonly GenerationTask[],
     loaded: LoadedConfiguration,
   ): Promise<PreparedNativeExecution> {
-    const authoredSnapshots = new Map<string, string | undefined>();
-    for (const task of tasks) {
-      if (task.operation === 'update-project') {
-        authoredSnapshots.set(
-          task.destination,
-          (await this.#files.inspect(task.destination)).sha256,
-        );
-      }
-    }
-
     const ownedOutputs: PreparedNativeExecution['ownedOutputs'][number][] = [];
-    const integrations: PreparedNativeExecution['integrations'][number][] = [];
     for (const task of tasks) {
       const outputs = await this.#executeTask(task, loaded);
-      for (const output of outputs) {
-        if (task.operation === 'update-project') {
-          integrations.push({
-            content: output.content,
-            destination: output.destination,
-            expectedSha256: authoredSnapshots.get(task.destination),
-          });
-        } else {
+      for (const [index, output] of outputs.entries()) {
           ownedOutputs.push({
-            artifactId: task.id,
+            artifactId: index === 0
+              ? task.id
+              : `${task.id}:${path.relative(task.destination, output.destination).split(path.sep).join('/')}`,
             content: output.content,
             destination: output.destination,
             target: task.target,
           });
-        }
       }
     }
-    return { integrations, ownedOutputs };
+    return {
+      ownedOutputs,
+      usage: tasks.flatMap((task) => task.usage ?? []),
+    };
   }
 
   async #executeTask(
@@ -147,8 +130,8 @@ export class DefaultNativeTaskExecutor implements NativeTaskExecutor {
     }
     const content =
       task.target === 'android'
-        ? await androidTaskContent(task, loaded.config)
-        : await iosTaskContent(task, loaded.config, loaded.projectRoot);
+        ? androidTaskContent(task, loaded.config)
+        : iosTaskContent(task, loaded.config);
     return [{ destination: task.destination, content }];
   }
 }

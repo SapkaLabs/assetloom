@@ -48,7 +48,6 @@ async function fixture() {
         android: {
           enabled: true,
           resourceDirectory: './android/app/src/main/res',
-          manifestPath: './android/app/src/main/AndroidManifest.xml',
         },
       },
       resources: {
@@ -99,12 +98,9 @@ describe('generation lifecycle', () => {
       path.join(directory, '.assetloom'),
     ).load();
     expect(Object.keys(nativeManifest.files).sort()).toEqual(
-      first.plan.tasks
-        .filter((task) => task.operation !== 'update-project')
-        .map((task) =>
+      first.plan.tasks.map((task) =>
           path.relative(directory, task.destination).split(path.sep).join('/'),
-        )
-        .sort(),
+        ).sort(),
     );
     expect(
       new Set(

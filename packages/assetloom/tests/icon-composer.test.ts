@@ -43,7 +43,7 @@ const project = `// !$*UTF8*$!
 `;
 
 describe('Icon Composer passthrough', () => {
-  it('copies an opaque .icon package and integrates it idempotently', async () => {
+  it('copies an opaque .icon package without changing the Xcode project', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'assetloom-icon-'));
     await mkdir(path.join(root, 'source', 'Brand.icon'), { recursive: true });
     await mkdir(path.join(root, 'ios', 'Demo.xcodeproj'), { recursive: true });
@@ -67,7 +67,6 @@ describe('Icon Composer passthrough', () => {
           ios: {
             enabled: true,
             projectDirectory: './ios/Demo',
-            projectFile: './ios/Demo.xcodeproj/project.pbxproj',
             assetCatalogDirectory: './ios/Demo/Images.xcassets',
           },
         },
@@ -86,7 +85,7 @@ describe('Icon Composer passthrough', () => {
     const loaded = await loadConfiguration(['assetloom.json'], { cwd: root });
 
     const first = await generate(loaded);
-    expect(first.written).toHaveLength(2);
+    expect(first.written).toHaveLength(1);
     expect(
       await readFile(path.join(root, 'ios', 'Demo', 'AppIcon.icon', 'icon.json'), 'utf8'),
     ).toBe('{"opaque":"fixture"}\n');
@@ -94,12 +93,7 @@ describe('Icon Composer passthrough', () => {
       path.join(root, 'ios', 'Demo.xcodeproj', 'project.pbxproj'),
       'utf8',
     );
-    expect(updatedProject).toContain(
-      'lastKnownFileType = folder.iconcomposer.icon',
-    );
-    expect(updatedProject).toContain(
-      'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon',
-    );
+    expect(updatedProject).toBe(project);
 
     await verify(loaded);
     const second = await generate(loaded);

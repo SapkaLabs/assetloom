@@ -1,18 +1,24 @@
-# Workstream ownership
+# Architecture ownership
 
-The implementation workstreams are:
+Repository work follows the focused workspace boundaries:
 
-- Orchestrator — phase sequencing, contracts, repository-local state.
-- Platform Research Agent — official Android and Apple sources.
-- Configuration Agent — merging, provenance, schema, path validation.
-- Core and Planner Agent — domain types, task graph, collision detection.
-- Rendering Agent — safe decoding and deterministic raster output.
-- Android Agent — resource presets, manifest integration, Gradle verification.
-- iOS Agent — catalogs, Icon Composer passthrough, Xcode verification.
-- Storage Agent — cache, manifest, locking, atomic writes, cleanup, ignores.
-- CLI Agent — commands, target filters, human and JSON diagnostics.
-- Demo Application Agent — bare React Native native projects and artwork.
-- Quality Agent — tests, CI, determinism, package validation.
+- Core owns resource-neutral contracts, configuration composition,
+  orchestration, output-root validation, hashing, cache/state, ownership,
+  bounded publication, recovery, diagnostics, and versioned results.
+- Images owns generic image inspection/transformation, Sharp, encoders,
+  recipes, dimensions, formats, and renderer compatibility.
+- Native owns Android/iOS/React Native presets, validators, semantic roles,
+  complete resource layouts, and typed manual-setup descriptors.
+- Web owns web presets, favicon/social/PWA variants, public-path resolution,
+  final-byte cache policies, and typed web descriptors.
+- The facade owns default composition, compatibility APIs that remain valid,
+  every Commander command, human output, JSON output, and the executable.
+- Demo and fixture owners prove caller-managed setup and platform compilation
+  without granting AssetLoom mutation authority.
+- Quality owns architecture tests, write-boundary sentinels, package packing,
+  clean-consumer tests, determinism, and platform verification.
 
-Each workstream owns its matching directory, but public contract changes require
-an architecture decision record.
+Public contract or boundary changes require an architecture decision record.
+Packages may import only another package's declared public exports. No
+workstream may add a consumer-project writer or a generic escape hatch around
+the bounded publisher.

@@ -1,6 +1,3 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { LoomError } from '../../domain/errors.js';
 import type {
   AppIconResource,
@@ -191,180 +188,10 @@ function launchStoryboard(): Buffer {
 `);
 }
 
-function pbxId(value: string): string {
-  return createHash('sha256').update(value).digest('hex').slice(0, 24).toUpperCase();
-}
-
-function addProjectResource(
-  source: string,
-  projectFile: string,
-  resourcePath: string,
-  fileType: 'file.storyboard' | 'folder.iconcomposer.icon',
-): string {
-  const normalizedPath = resourcePath.split(path.sep).join('/');
-  const pathValue = /^[A-Za-z0-9_./-]+$/.test(normalizedPath)
-    ? normalizedPath
-    : JSON.stringify(normalizedPath);
-  if (source.includes(`path = ${pathValue};`)) {
-    if (fileType === 'folder.iconcomposer.icon') {
-      return source.replace(
-        `lastKnownFileType = folder; path = ${pathValue};`,
-        `lastKnownFileType = folder.iconcomposer.icon; path = ${pathValue};`,
-      );
-    }
-    return source;
-  }
-  if (source.includes('PBXFileSystemSynchronizedRootGroup')) {
-    return source;
-  }
-
-  const fileId = pbxId(`file:${normalizedPath}`);
-  const buildId = pbxId(`build:${normalizedPath}`);
-  const label = path.basename(normalizedPath);
-  const requiredMarkers = [
-    '/* End PBXBuildFile section */',
-    '/* End PBXFileReference section */',
-    '/* Begin PBXGroup section */',
-    '/* Begin PBXResourcesBuildPhase section */',
-  ];
-  if (!requiredMarkers.every((marker) => source.includes(marker))) {
-    throw new LoomError({
-      code: 'LOOM_IOS_PROJECT_UPDATE_FAILED',
-      message: 'Xcode project does not contain the sections required for resource integration.',
-      context: { projectFile },
-    });
-  }
-
-  let updated = source.replace(
-    '/* End PBXBuildFile section */',
-    `\t\t${buildId} /* ${label} in Resources */ = {isa = PBXBuildFile; fileRef = ${fileId} /* ${label} */; };\n/* End PBXBuildFile section */`,
-  );
-  updated = updated.replace(
-    '/* End PBXFileReference section */',
-    `\t\t${fileId} /* ${label} */ = {isa = PBXFileReference; lastKnownFileType = ${fileType}; path = ${pathValue}; sourceTree = "<group>"; };\n/* End PBXFileReference section */`,
-  );
-  const groupSection = updated.indexOf('/* Begin PBXGroup section */');
-  const children = updated.indexOf('children = (', groupSection);
-  if (children === -1) {
-    throw new LoomError({
-      code: 'LOOM_IOS_PROJECT_UPDATE_FAILED',
-      message: 'Xcode project does not contain a mutable root group.',
-      context: { projectFile },
-    });
-  }
-  const childInsertion = children + 'children = ('.length;
-  updated = `${updated.slice(0, childInsertion)}\n\t\t\t\t${fileId} /* ${label} */,${updated.slice(childInsertion)}`;
-
-  const resourcesSection = updated.indexOf(
-    '/* Begin PBXResourcesBuildPhase section */',
-  );
-  const resourceFiles = updated.indexOf('files = (', resourcesSection);
-  if (resourceFiles === -1) {
-    throw new LoomError({
-      code: 'LOOM_IOS_PROJECT_UPDATE_FAILED',
-      message: 'Xcode project does not contain a resources build phase.',
-      context: { projectFile },
-    });
-  }
-  const resourceInsertion = resourceFiles + 'files = ('.length;
-  return `${updated.slice(0, resourceInsertion)}\n\t\t\t\t${buildId} /* ${label} in Resources */,${updated.slice(resourceInsertion)}`;
-}
-
-function updateProjectBuildSettings(
-  source: string,
-  appIconName: string,
-): string {
-  if (!source.includes('buildSettings = {')) {
-    throw new LoomError({
-      code: 'LOOM_IOS_PROJECT_UPDATE_FAILED',
-      message: 'Xcode project does not contain build settings.',
-    });
-  }
-  return source.replace(
-    /buildSettings = \{([\s\S]*?)\n(\s*)\};/g,
-    (_match, body: string, indent: string) => {
-      const cleaned = body
-        .replace(/\n\s*ASSETCATALOG_COMPILER_APPICON_NAME\s*=[^;]+;/g, '')
-        .replace(/\n\s*INFOPLIST_KEY_UILaunchStoryboardName\s*=[^;]+;/g, '');
-      return `buildSettings = {
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = ${appIconName};
-\t\t\t\tINFOPLIST_KEY_UILaunchStoryboardName = AssetloomLaunchScreen;${cleaned}
-${indent}};`;
-    },
-  );
-}
-
-async function updateProject(
+export function iosTaskContent(
   task: GenerationTask,
   config: AssetloomConfiguration,
-  projectRoot: string,
-): Promise<Buffer> {
-  try {
-    let source = await readFile(task.destination, 'utf8');
-    const icon = appIcon(config);
-    const appIconName =
-      icon?.ios?.mode === 'icon-composer'
-        ? (icon.ios.name ?? 'AppIcon')
-        : 'AppIcon';
-    source = updateProjectBuildSettings(source, appIconName);
-
-    const iosTarget = config.targets.ios;
-    if (iosTarget !== undefined && splash(config) !== undefined) {
-      const storyboard = path.resolve(
-        projectRoot,
-        iosTarget.projectDirectory,
-        'AssetloomLaunchScreen.storyboard',
-      );
-      const relative = path.relative(
-        path.dirname(path.dirname(task.destination)),
-        storyboard,
-      );
-      source = addProjectResource(
-        source,
-        task.destination,
-        relative,
-        'file.storyboard',
-      );
-    }
-    if (
-      iosTarget !== undefined &&
-      icon?.ios?.mode === 'icon-composer'
-    ) {
-      const composerDirectory = path.resolve(
-        projectRoot,
-        iosTarget.projectDirectory,
-        `${icon.ios.name ?? 'AppIcon'}.icon`,
-      );
-      const relative = path.relative(
-        path.dirname(path.dirname(task.destination)),
-        composerDirectory,
-      );
-      source = addProjectResource(
-        source,
-        task.destination,
-        relative,
-        'folder.iconcomposer.icon',
-      );
-    }
-    return Buffer.from(source.endsWith('\n') ? source : `${source}\n`);
-  } catch (cause) {
-    if (cause instanceof LoomError) {
-      throw cause;
-    }
-    throw new LoomError({
-      code: 'LOOM_IOS_PROJECT_UPDATE_FAILED',
-      message: 'Failed to update the iOS Xcode project.',
-      cause,
-      context: { projectFile: task.destination },
-    });
-  }
-}
-
-export async function iosTaskContent(
-  task: GenerationTask,
-  config: AssetloomConfiguration,
-  projectRoot: string,
-): Promise<Buffer> {
+): Buffer {
   if (task.id.endsWith(':ios:contents')) {
     return appIconContents(config);
   }
@@ -376,9 +203,6 @@ export async function iosTaskContent(
   }
   if (task.id.endsWith(':ios:storyboard')) {
     return launchStoryboard();
-  }
-  if (task.id === 'ios:project') {
-    return updateProject(task, config, projectRoot);
   }
   throw new LoomError({
     code: 'LOOM_PLAN_INVALID',

@@ -1,8 +1,8 @@
 import path from 'node:path';
 import { Command, CommanderError, Option } from 'commander';
-import { clean, generate } from '../api/generate.js';
+import { clean } from '../api/generate.js';
 import { cleanV2 } from '../api/clean-v2.js';
-import { generateV2 } from '../api/generate-v2.js';
+import { generateVersioned } from '../api/generate-v2.js';
 import { createCatalogReport } from '../api/report-v2.js';
 import { createHtmlReport } from '../api/report.js';
 import { verifyV2 } from '../api/verify-v2.js';
@@ -21,7 +21,13 @@ import {
 } from '../application/planning/composite-planner.js';
 import { createGenerationPlan, parseTarget } from '../planner/index.js';
 import { verify } from '../verification/index.js';
-import { printError, printResult } from './output.js';
+import {
+  printError,
+  printGenerationResult,
+  printInformation,
+  printResult,
+} from './output.js';
+import { writeCliGenerationResultFile } from './result-file.js';
 
 interface CommonCommandOptions {
   config: string[];
@@ -35,13 +41,14 @@ interface VerifyCommandOptions extends CommonCommandOptions {
 interface GenerateCommandOptions extends CommonCommandOptions {
   report?: boolean;
   reportOutput?: string;
+  resultFile?: string;
 }
 
 interface ReportCommandOptions extends CommonCommandOptions {
   output?: string;
 }
 
-function collect(value: string, previous: string[]): string[] {
+function collect(value: string, previous: string[] = []): string[] {
   return [...previous, value];
 }
 
@@ -51,7 +58,6 @@ function addCommonOptions(command: Command): Command {
       '-c, --config <file>',
       'configuration file; repeat in merge order',
       collect,
-      [],
     )
     .addOption(
       new Option(
@@ -128,6 +134,7 @@ export function createProgram(): Command {
     .option('--json', 'emit machine-readable JSON')
     .option('--verbose', 'include diagnostic stack traces')
     .showHelpAfterError()
+    .configureOutput({ writeErr: () => undefined })
     .exitOverride();
 
   addCommonOptions(
@@ -185,102 +192,72 @@ export function createProgram(): Command {
       '--report-output <file>',
       'report path relative to the project root; implies --report',
     )
+    .option(
+      '--result-file <file>',
+      'stable result JSON path relative to .assetloom/results',
+    )
     .action(async (options: GenerateCommandOptions, command: Command) => {
       const loaded = await loadVersionedConfiguration(options.config);
-      if (loaded.config.schemaVersion === 1) {
-        const nativeLoaded = legacyLoaded(loaded);
-        const target = targetOption(options.target);
-        const result = await generate(nativeLoaded, {
-          ...(target === undefined ? {} : { target }),
-        });
-        const report =
-          options.report === true || options.reportOutput !== undefined
-            ? await createHtmlReport(nativeLoaded, {
-                ...(target === undefined ? {} : { target }),
+      const runtime = createDefaultCatalogRuntime(loaded);
+      const result = await generateVersioned(loaded, {
+        ...runtime,
+        ...(options.target === undefined ? {} : { target: options.target }),
+      });
+      const legacyReportTarget =
+        loaded.config.schemaVersion === 1 && options.target !== undefined
+          ? targetOption(options.target)
+          : undefined;
+      const report =
+        options.report === true || options.reportOutput !== undefined
+          ? loaded.config.schemaVersion === 1
+            ? await createHtmlReport(legacyLoaded(loaded), {
+                ...(legacyReportTarget === undefined
+                  ? {}
+                  : { target: legacyReportTarget }),
                 ...(options.reportOutput === undefined
                   ? {}
                   : { output: options.reportOutput }),
               })
-            : undefined;
-        const humanReport =
-          report === undefined
-            ? ''
-            : `\nReport: ${portableRelative(nativeLoaded.projectRoot, report.path)} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
-        printResult(
-          {
-            ok: true,
-            result: {
-              targets: result.plan.targets,
-              written: result.written.map((item) =>
-                portableRelative(nativeLoaded.projectRoot, item),
-              ),
-              unchanged: result.unchanged.map((item) =>
-                portableRelative(nativeLoaded.projectRoot, item),
-              ),
-              removed: result.removed.map((item) =>
-                portableRelative(nativeLoaded.projectRoot, item),
-              ),
-              ...(report === undefined
-                ? {}
-                : {
-                    report: {
-                      ...report,
-                      path: portableRelative(nativeLoaded.projectRoot, report.path),
-                    },
-                  }),
-            },
-          },
-          rootOptions(command),
-          `Generated ${result.written.length} changed file(s); ${result.unchanged.length} unchanged; ${result.removed.length} stale file(s) removed.${humanReport}`,
-        );
-        return;
-      }
-
-      const runtime = createDefaultCatalogRuntime(loaded);
-      const result = await generateV2(loaded, {
-        ...runtime,
-        ...(options.target === undefined ? {} : { target: options.target }),
-      });
-      const report =
-        options.report === true || options.reportOutput !== undefined
-          ? await createCatalogReport(loaded, {
-              ...runtime,
-              ...(options.target === undefined ? {} : { target: options.target }),
-              ...(options.reportOutput === undefined
-                ? {}
-                : { output: options.reportOutput }),
-            })
+            : await createCatalogReport(loaded, {
+                ...runtime,
+                ...(options.target === undefined
+                  ? {}
+                  : { target: options.target }),
+                ...(options.reportOutput === undefined
+                  ? {}
+                  : { output: options.reportOutput }),
+              })
           : undefined;
-      const humanReport =
+      const resultFile =
+        options.resultFile === undefined
+          ? undefined
+          : await writeCliGenerationResultFile(
+              loaded.projectRoot,
+              options.resultFile,
+              result,
+            );
+      const reportSummary =
         report === undefined
           ? ''
           : `\nReport: ${portableRelative(loaded.projectRoot, report.path)} (${report.healthy ? 'all outputs verified' : `${report.issues} issue(s)`}).`;
-      printResult(
-        {
-          ok: true,
-          result: {
-            targets: result.plan.targets,
-            written: result.written.map((item) =>
-              portableRelative(loaded.projectRoot, item),
-            ),
-            unchanged: result.unchanged.map((item) =>
-              portableRelative(loaded.projectRoot, item),
-            ),
-            removed: result.removed.map((item) =>
-              portableRelative(loaded.projectRoot, item),
-            ),
-            ...(report === undefined
-              ? {}
-              : {
-                  report: {
-                    ...report,
-                    path: portableRelative(loaded.projectRoot, report.path),
-                  },
-                }),
-          },
-        },
-        rootOptions(command),
-        `Generated ${result.written.length} changed file(s); ${result.unchanged.length} unchanged; ${result.removed.length} stale file(s) removed.${humanReport}`,
+      const resultFileSummary =
+        resultFile === undefined
+          ? ''
+          : `\nResult: ${resultFile.path} (${resultFile.disposition}).`;
+      const changed = result.artifacts.filter(
+        (artifact) => artifact.disposition !== 'unchanged',
+      ).length;
+      const unchanged = result.artifacts.length - changed;
+      const outputOptions = rootOptions(command);
+      if (outputOptions.json && report !== undefined) {
+        printInformation(
+          `Report: ${portableRelative(loaded.projectRoot, report.path)}.`,
+        );
+      }
+      printGenerationResult(
+        result,
+        outputOptions,
+        `Generated ${changed} changed artifact(s); ${unchanged} unchanged; ${result.removed.length} stale owned artifact(s) removed.${resultFileSummary}${reportSummary}`,
       );
     });
 
@@ -378,27 +355,19 @@ export function createProgram(): Command {
       return;
     }
 
-    const runtime = createDefaultCatalogRuntime(loaded);
     const result = await cleanV2(loaded, {
-      integrationAdapters: runtime.integrationAdapters,
       ...(options.target === undefined ? {} : { target: options.target }),
     });
     const removed = result.removed.map((item) =>
       portableRelative(loaded.projectRoot, item),
     );
-    const updatedIntegrations = result.updatedIntegrations.map((item) =>
-      portableRelative(loaded.projectRoot, item),
-    );
-    const unchangedIntegrations = result.unchangedIntegrations.map((item) =>
-      portableRelative(loaded.projectRoot, item),
-    );
     printResult(
       {
         ok: true,
-        result: { removed, updatedIntegrations, unchangedIntegrations },
+        result: { removed },
       },
       rootOptions(command),
-      `Removed ${removed.length} Assetloom-owned file(s); updated ${updatedIntegrations.length} integration file(s).`,
+      `Removed ${removed.length} Assetloom-owned file(s).`,
     );
   });
 
@@ -427,7 +396,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
         json: program.opts<{ json?: boolean }>().json === true,
         verbose: program.opts<{ verbose?: boolean }>().verbose === true,
       });
-      return error.exitCode || 2;
+      return 2;
     }
     const loomError = asLoomError(error);
     printError(loomError, {

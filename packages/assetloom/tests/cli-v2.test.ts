@@ -3,8 +3,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadConfiguration } from '../src/config/load.js';
+import { loadVersionedConfiguration } from '../src/config/load.js';
 import { runCli } from '../src/cli/program.js';
 import { createGenerationPlan } from '../src/planner/index.js';
+import type { GenerationResultV1 } from '../src/domain/generation-result.js';
+import {
+  stableGenerationResultJson,
+  validateGenerationResultV1,
+} from '../src/domain/generation-result.js';
+import { generateVersioned } from '../src/api/generate-v2.js';
+import { createDefaultCatalogRuntime } from '../src/infrastructure/composition/default-catalog-runtime.js';
 
 interface JsonCommandResult {
   readonly ok: boolean;
@@ -20,7 +28,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function jsonCommand(args: readonly string[]): Promise<JsonCommandResult> {
+async function captureCommand(args: readonly string[]): Promise<{
+  readonly code: number;
+  readonly stderr: string;
+  readonly stdout: string;
+}> {
+  vi.restoreAllMocks();
   let stdout = '';
   let stderr = '';
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
@@ -31,13 +44,71 @@ async function jsonCommand(args: readonly string[]): Promise<JsonCommandResult> 
     stderr += String(chunk);
     return true;
   });
-  const code = await runCli(['--json', ...args]);
+  const code = await runCli(args);
+  return { code, stderr, stdout };
+}
+
+async function jsonCommand(args: readonly string[]): Promise<JsonCommandResult> {
+  const { code, stderr, stdout } = await captureCommand(['--json', ...args]);
   expect(code, stderr).toBe(0);
   expect(stderr).toBe('');
   return JSON.parse(stdout) as JsonCommandResult;
 }
 
+async function generationCommand(
+  args: readonly string[],
+): Promise<GenerationResultV1> {
+  const { code, stderr, stdout } = await captureCommand(['--json', ...args]);
+  expect(code, stderr).toBe(0);
+  expect(stderr).toBe('');
+  const parsed: unknown = JSON.parse(stdout);
+  expect(parsed).not.toHaveProperty('ok');
+  expect(stdout.trim().endsWith('}')).toBe(true);
+  return validateGenerationResultV1(parsed);
+}
+
 describe('versioned CLI composition', () => {
+  it('matches the authoritative Node result in an independent fixture', async () => {
+    const createFixture = async (prefix: string) => {
+      const directory = await mkdtemp(path.join(tmpdir(), prefix));
+      const configPath = path.join(directory, 'assetloom.json');
+      await writeFile(path.join(directory, 'source.txt'), 'same portable bytes\n');
+      await writeFile(
+        configPath,
+        JSON.stringify({
+          schemaVersion: 2,
+          project: { root: directory },
+          targets: { archive: { kind: 'directory', root: './out' } },
+          resources: {
+            copied: {
+              type: 'files',
+              source: { file: './source.txt' },
+              outputs: [
+                { target: 'archive', directory: '.', path: 'copied.txt' },
+              ],
+            },
+          },
+        }),
+      );
+      return { configPath, directory };
+    };
+    const cliFixture = await createFixture('assetloom-cli-equality-');
+    const nodeFixture = await createFixture('assetloom-node-equality-');
+    const cliResult = await generationCommand([
+      'generate',
+      '-c',
+      cliFixture.configPath,
+    ]);
+    const loaded = await loadVersionedConfiguration([nodeFixture.configPath]);
+    const nodeResult = await generateVersioned(
+      loaded,
+      createDefaultCatalogRuntime(loaded),
+    );
+    expect(stableGenerationResultJson(cliResult)).toBe(
+      stableGenerationResultJson(nodeResult),
+    );
+  });
+
   it('preserves the exact schema-v1 plan JSON contract', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-cli-v1-'));
     const configPath = path.join(directory, 'assetloom.json');
@@ -54,7 +125,6 @@ describe('versioned CLI composition', () => {
           android: {
             enabled: true,
             resourceDirectory: './android/res',
-            manifestPath: './android/AndroidManifest.xml',
           },
         },
         resources: {
@@ -87,6 +157,19 @@ describe('versioned CLI composition', () => {
       },
     });
     expect(result.plan).not.toHaveProperty('artifacts');
+
+    const generated = await generationCommand([
+      'generate',
+      '-c',
+      configPath,
+      '--target',
+      'android',
+    ]);
+    expect(generated).toMatchObject({
+      resultVersion: 1,
+      targets: ['android'],
+    });
+    expect(generated.artifacts.length).toBeGreaterThan(0);
   });
 
   it('runs the schema-v2 plan/generate/no-op/verify/report/clean lifecycle', async () => {
@@ -142,36 +225,46 @@ describe('versioned CLI composition', () => {
     });
     expect(plan.plan).not.toHaveProperty('tasks');
 
-    const first = await jsonCommand([
+    const first = await generationCommand([
       'generate',
       '-c',
       configPath,
       '--target',
       'archive',
     ]);
-    expect(first.result).toMatchObject({
+    expect(first).toMatchObject({
+      resultVersion: 1,
       targets: ['archive'],
-      written: ['out/copied.txt'],
-      unchanged: [],
       removed: [],
     });
+    expect(first.artifacts).toEqual([
+      expect.objectContaining({
+        relativePath: 'copied.txt',
+        disposition: 'created',
+      }),
+    ]);
     expect(await readFile(path.join(directory, 'out/copied.txt'), 'utf8')).toBe(
       'configurable asset\n',
     );
 
-    const second = await jsonCommand([
+    const second = await generationCommand([
       'generate',
       '-c',
       configPath,
       '--target',
       'archive',
     ]);
-    expect(second.result).toMatchObject({
+    expect(second).toMatchObject({
+      resultVersion: 1,
       targets: ['archive'],
-      written: [],
-      unchanged: ['out/copied.txt'],
       removed: [],
     });
+    expect(second.artifacts).toEqual([
+      expect.objectContaining({
+        relativePath: 'copied.txt',
+        disposition: 'unchanged',
+      }),
+    ]);
 
     const verified = await jsonCommand([
       'verify',
@@ -213,11 +306,7 @@ describe('versioned CLI composition', () => {
       '--target',
       'archive',
     ]);
-    expect(cleaned.result).toEqual({
-      removed: ['out/copied.txt'],
-      updatedIntegrations: [],
-      unchangedIntegrations: [],
-    });
+    expect(cleaned.result).toEqual({ removed: ['out/copied.txt'] });
     await expect(
       readFile(path.join(directory, 'out/copied.txt')),
     ).rejects.toMatchObject({ code: 'ENOENT' });
@@ -245,7 +334,6 @@ describe('versioned CLI composition', () => {
           android: {
             enabled: true,
             resourceDirectory: './android/res',
-            manifestPath: './android/AndroidManifest.xml',
           },
           archive: { kind: 'directory', root: './out' },
         },
@@ -287,8 +375,9 @@ describe('versioned CLI composition', () => {
       }),
     );
 
-    const generated = await jsonCommand(['generate', '-c', configPath]);
-    expect(generated.result).toMatchObject({
+    const generated = await generationCommand(['generate', '-c', configPath]);
+    expect(generated).toMatchObject({
+      resultVersion: 1,
       targets: ['android', 'archive'],
     });
     expect(await readFile(path.join(directory, 'out/copied.txt'), 'utf8')).toBe(
@@ -335,6 +424,100 @@ describe('versioned CLI composition', () => {
     expect(JSON.parse(stderr)).toMatchObject({
       ok: false,
       error: { code: 'LOOM_CFG_PATH_INVALID' },
+    });
+  });
+
+  it('keeps human summaries, result/report paths, and JSON report logs separated', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-cli-human-'));
+    const configPath = path.join(directory, 'assetloom.json');
+    await writeFile(path.join(directory, 'source.txt'), 'human output\n');
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        metadata: { name: 'Human CLI fixture' },
+        project: { root: directory },
+        targets: { archive: { kind: 'directory', root: './out' } },
+        resources: {
+          copied: {
+            type: 'files',
+            source: { file: './source.txt' },
+            outputs: [{ target: 'archive', directory: '.', path: 'copied.txt' }],
+          },
+        },
+      }),
+    );
+    const first = await captureCommand([
+      'generate',
+      '-c',
+      configPath,
+      '--result-file',
+      'human.json',
+      '--report-output',
+      '.assetloom/human-report.html',
+    ]);
+    expect(first).toMatchObject({ code: 0, stderr: '' });
+    expect(first.stdout).toContain('Generated 1 changed artifact(s); 0 unchanged');
+    expect(first.stdout).toContain('Result: .assetloom/results/human.json (written).');
+    expect(first.stdout).toContain('Report: .assetloom/human-report.html');
+
+    const second = await captureCommand(['generate', '-c', configPath]);
+    expect(second).toMatchObject({ code: 0, stderr: '' });
+    expect(second.stdout).toContain('Generated 0 changed artifact(s); 1 unchanged');
+
+    const jsonReport = await captureCommand([
+      '--json',
+      'generate',
+      '-c',
+      configPath,
+      '--report-output',
+      '.assetloom/json-report.html',
+    ]);
+    expect(jsonReport.code).toBe(0);
+    expect(validateGenerationResultV1(JSON.parse(jsonReport.stdout))).toMatchObject({
+      resultVersion: 1,
+    });
+    expect(jsonReport.stderr).toBe('Report: .assetloom/json-report.html.\n');
+  });
+
+  it('retains success, usage, and runtime exit code classes', async () => {
+    expect((await captureCommand(['--help'])).code).toBe(0);
+    expect((await captureCommand(['--version'])).code).toBe(0);
+    const usage = await captureCommand(['--json', 'generate']);
+    expect(usage.code).toBe(2);
+    expect(usage.stdout).toBe('');
+    expect(JSON.parse(usage.stderr)).toMatchObject({
+      ok: false,
+      error: { code: 'LOOM_CLI_USAGE' },
+    });
+    const directory = await mkdtemp(path.join(tmpdir(), 'assetloom-cli-error-'));
+    const configPath = path.join(directory, 'assetloom.json');
+    await writeFile(
+      configPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        project: { root: directory },
+        targets: { archive: { kind: 'directory', root: './out' } },
+        resources: {
+          missing: {
+            type: 'files',
+            source: { file: './missing.txt' },
+            outputs: [{ target: 'archive', directory: '.' }],
+          },
+        },
+      }),
+    );
+    const runtime = await captureCommand([
+      '--json',
+      'generate',
+      '-c',
+      configPath,
+    ]);
+    expect(runtime.code).toBe(1);
+    expect(runtime.stdout).toBe('');
+    expect(JSON.parse(runtime.stderr)).toMatchObject({
+      ok: false,
+      error: { code: 'LOOM_SRC_NOT_FOUND' },
     });
   });
 });

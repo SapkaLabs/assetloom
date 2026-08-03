@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp, { type Sharp } from 'sharp';
+import { imageRendererCompatibilityVersion } from '@sapkalabs/assetloom-images';
 import type {
   ImageInput,
+  ImageRecipe,
   RasterImageRecipe,
   RenderImageArtifact,
 } from '../../domain/catalog/planning.js';
@@ -21,6 +23,56 @@ const SUPPORTED_EXTENSIONS = new Set([
   '.svg',
   '.webp',
 ]);
+
+const IMAGE_FINGERPRINT_REVISION = 2;
+
+function rasterRecipeFingerprint(
+  recipe: RasterImageRecipe,
+  inputOffset: number,
+): { readonly value: unknown; readonly nextInputOffset: number } {
+  if (recipe.kind === 'resize') {
+    return {
+      value: {
+        kind: recipe.kind,
+        input: inputOffset,
+        width: recipe.width,
+        height: recipe.height,
+        fit: recipe.fit,
+        background: recipe.background,
+      },
+      nextInputOffset: inputOffset + 1,
+    };
+  }
+  return {
+    value: {
+      kind: recipe.kind,
+      canvas: recipe.canvas,
+      layers: recipe.layers.map((layer, index) => ({
+        input: inputOffset + index,
+        left: layer.left,
+        top: layer.top,
+        width: layer.width,
+        height: layer.height,
+        fit: layer.fit,
+        blend: layer.blend,
+      })),
+    },
+    nextInputOffset: inputOffset + recipe.layers.length,
+  };
+}
+
+function imageRecipeFingerprint(recipe: ImageRecipe): unknown {
+  if (recipe.kind !== 'ico') {
+    return rasterRecipeFingerprint(recipe, 0).value;
+  }
+  let inputOffset = 0;
+  const images = recipe.images.map((image) => {
+    const fingerprint = rasterRecipeFingerprint(image.recipe, inputOffset);
+    inputOffset = fingerprint.nextInputOffset;
+    return { recipe: fingerprint.value };
+  });
+  return { kind: recipe.kind, images };
+}
 
 function validateSvg(content: Buffer, source: string): void {
   if (!content.toString('utf8').trimStart().startsWith('<')) {
@@ -45,6 +97,14 @@ export class ImageArtifactMaterializer
   implements CatalogArtifactMaterializer<RenderImageArtifact>
 {
   readonly operation = 'render-image' as const;
+  readonly #rendererCompatibilityVersion: string;
+
+  constructor(options: {
+    readonly rendererCompatibilityVersion?: string;
+  } = {}) {
+    this.#rendererCompatibilityVersion =
+      options.rendererCompatibilityVersion ?? imageRendererCompatibilityVersion;
+  }
 
   async materialize(
     artifact: RenderImageArtifact,
@@ -56,17 +116,16 @@ export class ImageArtifactMaterializer
   }> {
     const inputs = await this.#inputs(artifact, context);
     const parameters = JSON.stringify({
-      engine: `sharp-${sharp.versions.sharp}`,
-      revision: 1,
-      configuration: sha256(context.normalizedConfiguration),
-      artifact: {
-        format: artifact.format,
-        height: artifact.height,
-        presetVersion: artifact.presetVersion,
-        quality: artifact.quality,
-        recipe: artifact.recipe,
-        width: artifact.width,
+      renderer: {
+        compatibilityVersion: this.#rendererCompatibilityVersion,
+        fingerprintRevision: IMAGE_FINGERPRINT_REVISION,
       },
+      presetVersion: artifact.presetVersion,
+      output: {
+        format: artifact.format,
+        quality: artifact.quality,
+      },
+      recipe: imageRecipeFingerprint(artifact.recipe),
       inputs: inputs.map((input) => sha256(input)),
     });
     const alias = sha256(parameters);

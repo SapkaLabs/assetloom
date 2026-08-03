@@ -1,0 +1,34 @@
+{
+  "name": "@sapkalabs/assetloom-images",
+  "version": "0.2.0",
+  "description": "Generic image recipes and Sharp-backed inspection for AssetLoom",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sapkalabs/assetloom-core": "workspace:^",
+    "sharp": "0.35.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0"
+  }
+}

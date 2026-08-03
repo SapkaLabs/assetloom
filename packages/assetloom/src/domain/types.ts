@@ -4,6 +4,7 @@ import type {
 import type {
   CatalogTargetConfiguration,
 } from './catalog/targets.js';
+import type { UsageDescriptorV1 } from './generation-result.js';
 
 export type TargetPlatform = 'android' | 'ios';
 
@@ -12,8 +13,7 @@ export type GenerationOperation =
   | 'compose'
   | 'copy'
   | 'write-json'
-  | 'write-xml'
-  | 'update-project';
+  | 'write-xml';
 
 export type GenerationRenderMode = 'standard' | 'monochrome' | 'tinted';
 
@@ -30,6 +30,7 @@ export interface GenerationTask {
   format?: 'png' | 'webp' | 'json' | 'xml' | 'directory';
   destination: string;
   presetVersion: string;
+  usage?: readonly UsageDescriptorV1[];
 }
 
 export interface SourceReference {
@@ -39,13 +40,11 @@ export interface SourceReference {
 export interface AndroidTargetConfiguration {
   enabled: boolean;
   resourceDirectory: string;
-  manifestPath: string;
 }
 
 export interface IosTargetConfiguration {
   enabled: boolean;
   projectDirectory: string;
-  projectFile: string;
   assetCatalogDirectory: string;
 }
 

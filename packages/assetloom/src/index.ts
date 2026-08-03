@@ -7,11 +7,12 @@ export { verify } from './api/verify.js';
 export type { VerifyOptions } from './api/verify.js';
 export { cleanV2 } from './api/clean-v2.js';
 export type { CleanV2Options, CleanV2Result } from './api/clean-v2.js';
-export { generateV2 } from './api/generate-v2.js';
+export { generateV2, generateVersioned } from './api/generate-v2.js';
 export type {
   GenerateV2Dependencies,
   GenerateV2Options,
   GenerateV2Result,
+  GenerateVersionedOptions,
 } from './api/generate-v2.js';
 export { createCatalogReport } from './api/report-v2.js';
 export type {
@@ -55,6 +56,56 @@ export type {
   LoomErrorCode,
   LoomErrorOptions,
 } from './domain/errors.js';
+export {
+  isJsonSafeValue,
+  isPortableResultPath,
+  stableGenerationResultJson,
+  validateGenerationResultV1,
+} from './domain/generation-result.js';
+export type {
+  WebHeadMetadataPayloadV1,
+  WebHeadMetadataUsageV1,
+  WebHtmlLinkPayloadV1,
+  WebHtmlLinkUsageV1,
+  WebStaticHostPayloadV1,
+  WebStaticHostUsageV1,
+  WebUsageDescriptorV1,
+} from './domain/web-usage.js';
+export type {
+  NativeResourceUsagePayloadV1,
+  NativeResourceUsageV1,
+} from './domain/native-usage.js';
+export type {
+  ContentHashV1,
+  DiagnosticV1,
+  GenerationResultV1,
+  JsonSafeValue,
+  PublishedArtifactDisposition,
+  PublishedArtifactV1,
+  RemovedArtifactV1,
+  UsageDescriptorV1,
+} from './domain/generation-result.js';
+export { OutputRootRegistry } from './application/planning/output-root-registry.js';
+export { inspectImage, imageRendererCompatibilityVersion } from '@sapkalabs/assetloom-images';
+export type { ImageRecipeV1, InspectedImageV1 } from '@sapkalabs/assetloom-images';
+export { assertNativeResourceName, createNativeResourceUsageV1 } from '@sapkalabs/assetloom-native';
+export type { NativeImagePresetV1, NativePlatform, NativeSemanticRole } from '@sapkalabs/assetloom-native';
+export {
+  appendWebCacheBustQuery,
+  assertWebHashTokenLength,
+  DEFAULT_WEB_CACHE_BUST_POLICY,
+  DEFAULT_WEB_HASH_TOKEN_LENGTH,
+  MAX_WEB_HASH_TOKEN_LENGTH,
+  MIN_WEB_HASH_TOKEN_LENGTH,
+  resolveWebPublicPath,
+  webContentHashToken,
+} from '@sapkalabs/assetloom-web';
+export type { WebCacheBustPolicy, WebImagePresetV1 } from '@sapkalabs/assetloom-web';
+export type {
+  OutputRootDefinition,
+  PlannedOutputPath,
+  ResolvedOutputPath,
+} from './application/planning/output-root-registry.js';
 export type {
   AppIconResource,
   AndroidTargetConfiguration,
@@ -91,21 +142,15 @@ export type {
   CatalogOperation,
   CatalogPlannedArtifact,
   CopyFileArtifact,
-  HtmlHeadElement,
-  HtmlHeadIntegrationRecipe,
   ImageInput,
   ImageRecipe,
-  IntegrationJsonValue,
-  IntegrationValue,
-  IntegrateProjectArtifact,
-  JsonValue,
-  ProjectIntegrationRecipe,
+  InterpolatedArtifactString,
+  JsonArtifactTemplate,
+  PlannedJsonValue,
+  PlannedUsageDescriptorV1,
   RenderImageArtifact,
   RasterImageRecipe,
-  StaticWebAppConfigIntegrationRecipe,
-  StaticWebAppRoute,
   TransformSvgArtifact,
-  WebManifestIntegrationRecipe,
   WriteTextArtifact,
 } from './domain/catalog/planning.js';
 export {
@@ -134,7 +179,7 @@ export type {
   SvgComponentOutput,
   SvgComponentsResource,
   SvgRuntime,
-  StaticWebAppIntegrationConfiguration,
+  WebStaticHostGuidanceConfiguration,
   WebAppBrandingResource,
   WebBrandManifestMetadata,
   WebBrandNamingPolicy,

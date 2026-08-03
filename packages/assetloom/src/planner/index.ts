@@ -163,6 +163,44 @@ function assertNoCollisions(tasks: readonly GenerationTask[]): void {
   }
 }
 
+function withNativeUsage(
+  tasks: readonly GenerationTask[],
+  projectRoot: string,
+): GenerationTask[] {
+  return tasks.map((task) => {
+    const relativePath = path
+      .relative(projectRoot, task.destination)
+      .split(path.sep)
+      .join('/');
+    const name = path.basename(task.destination, path.extname(task.destination));
+    const manualSetup = task.target === 'android'
+      ? [
+          'Reference the generated Android resource from caller-owned manifest, theme, or source configuration as appropriate.',
+          'AssetLoom does not edit AndroidManifest.xml or Gradle files.',
+        ]
+      : [
+          'Add or select the generated resource in the caller-owned Xcode project and Info.plist as appropriate.',
+          'AssetLoom does not edit .pbxproj or plist files.',
+        ];
+    return {
+      ...task,
+      usage: [{
+        kind: 'native.resource',
+        version: 1,
+        targetId: task.target,
+        artifactIds: [task.id],
+        payload: {
+          platform: task.target,
+          role: `${task.resourceType}.${task.operation}`,
+          name,
+          relativePath,
+          manualSetup,
+        },
+      }],
+    };
+  });
+}
+
 export async function createGenerationPlan(
   loaded: LoadedConfiguration,
   targetFilter?: TargetPlatform,
@@ -302,11 +340,10 @@ export async function createGenerationPlan(
       (resource) =>
         resource.type === 'splash-screen' && resource.dark !== undefined,
     );
-    tasks.push(
-      {
+    tasks.push({
         id: 'android:values',
         resourceId: '__target__',
-        resourceType: 'target-integration',
+        resourceType: 'target-bundle',
         target: 'android',
         operation: 'write-xml',
         sourceDependencies: [],
@@ -317,28 +354,12 @@ export async function createGenerationPlan(
           'assetloom.xml',
         ),
         presetVersion: '1',
-      },
-      {
-        id: 'android:manifest',
-        resourceId: '__target__',
-        resourceType: 'target-integration',
-        target: 'android',
-        operation: 'update-project',
-        sourceDependencies: [],
-        format: 'xml',
-        destination: resolveProjectPath(
-          loaded.projectRoot,
-          androidTarget.manifestPath,
-          '/targets/android/manifestPath',
-        ),
-        presetVersion: '1',
-      },
-    );
+      });
     if (hasDarkSplash) {
       tasks.push({
         id: 'android:values-night',
         resourceId: '__target__',
-        resourceType: 'target-integration',
+        resourceType: 'target-bundle',
         target: 'android',
         operation: 'write-xml',
         sourceDependencies: [],
@@ -356,7 +377,7 @@ export async function createGenerationPlan(
         {
           id: 'android:values-v31',
           resourceId: '__target__',
-          resourceType: 'target-integration',
+          resourceType: 'target-bundle',
           target: 'android',
           operation: 'write-xml',
           sourceDependencies: [],
@@ -371,7 +392,7 @@ export async function createGenerationPlan(
         {
           id: 'android:splash-drawable',
           resourceId: '__target__',
-          resourceType: 'target-integration',
+          resourceType: 'target-bundle',
           target: 'android',
           operation: 'write-xml',
           sourceDependencies: [],
@@ -387,28 +408,11 @@ export async function createGenerationPlan(
     }
   }
 
-  if (targets.includes('ios') && iosTarget !== undefined) {
-    tasks.push({
-      id: 'ios:project',
-      resourceId: '__target__',
-      resourceType: 'target-integration',
-      target: 'ios',
-      operation: 'update-project',
-      sourceDependencies: [],
-      destination: resolveProjectPath(
-        loaded.projectRoot,
-        iosTarget.projectFile,
-        '/targets/ios/projectFile',
-      ),
-      presetVersion: '1',
-    });
-  }
-
   tasks.sort((left, right) => left.destination.localeCompare(right.destination));
   assertNoCollisions(tasks);
   return {
     projectRoot: loaded.projectRoot,
     targets,
-    tasks,
+    tasks: withNativeUsage(tasks, loaded.projectRoot),
   };
 }

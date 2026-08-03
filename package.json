@@ -8,12 +8,14 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "yarn workspace @sapkalabs/assetloom build",
-    "lint": "yarn workspace @sapkalabs/assetloom lint",
-    "typecheck": "yarn workspace @sapkalabs/assetloom typecheck && yarn workspace assetloom-demo typecheck",
+    "build": "yarn workspace @sapkalabs/assetloom-core build && yarn workspace @sapkalabs/assetloom-images build && yarn workspace @sapkalabs/assetloom-native build && yarn workspace @sapkalabs/assetloom-web build && yarn workspace @sapkalabs/assetloom build",
+    "lint": "yarn workspace @sapkalabs/assetloom-core lint && yarn workspace @sapkalabs/assetloom-images lint && yarn workspace @sapkalabs/assetloom-native lint && yarn workspace @sapkalabs/assetloom-web lint && yarn workspace @sapkalabs/assetloom lint",
+    "typecheck": "yarn workspace @sapkalabs/assetloom-core typecheck && yarn workspace @sapkalabs/assetloom-images typecheck && yarn workspace @sapkalabs/assetloom-native typecheck && yarn workspace @sapkalabs/assetloom-web typecheck && yarn workspace @sapkalabs/assetloom typecheck && yarn workspace assetloom-demo typecheck",
     "test": "yarn workspace @sapkalabs/assetloom test",
     "benchmark": "yarn workspace @sapkalabs/assetloom benchmark",
     "pack:smoke": "yarn workspace @sapkalabs/assetloom pack:smoke",
+    "demo:assets": "yarn workspace assetloom-demo assets:generate",
+    "demo:assets:verify": "yarn workspace assetloom-demo assets:verify",
     "demo:start": "yarn workspace assetloom-demo start",
     "demo:android": "yarn workspace assetloom-demo android",
     "demo:ios": "yarn workspace assetloom-demo ios"

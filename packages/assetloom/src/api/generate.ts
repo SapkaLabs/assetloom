@@ -18,7 +18,6 @@ import { createGenerationPlan } from '../planner/index.js';
 import { SharpRenderer } from '../renderers/sharp-renderer.js';
 import { AtomicWriter } from '../storage/atomic-writer.js';
 import { ContentCache } from '../storage/cache.js';
-import { GitIgnoreManager } from '../storage/gitignore-manager.js';
 import { sha256 } from '../storage/hash.js';
 import {
   type AssetloomManifest,
@@ -34,7 +33,6 @@ import { iosTaskContent } from '../targets/ios/content.js';
 interface Output {
   readonly destination: string;
   readonly content: Buffer;
-  readonly owned: boolean;
   readonly task: GenerationTask;
 }
 
@@ -60,7 +58,6 @@ async function copyDirectoryOutputs(
       {
         destination,
         content: await readFile(source),
-        owned: true,
         task,
       },
     ];
@@ -91,7 +88,6 @@ async function copyDirectoryOutputs(
       outputs.push({
         destination: childDestination,
         content: await readFile(childSource),
-        owned: true,
         task,
       });
     }
@@ -109,7 +105,6 @@ async function executeTask(
       {
         destination: task.destination,
         content: await renderer.render(task),
-        owned: true,
         task,
       },
     ];
@@ -139,13 +134,12 @@ async function executeTask(
 
   const content =
     task.target === 'android'
-      ? await androidTaskContent(task, loaded.config)
-      : await iosTaskContent(task, loaded.config, loaded.projectRoot);
+      ? androidTaskContent(task, loaded.config)
+      : iosTaskContent(task, loaded.config);
   return [
     {
       destination: task.destination,
       content,
-      owned: task.operation !== 'update-project',
       task,
     },
   ];
@@ -156,9 +150,6 @@ async function assertWritableOutput(
   projectRoot: string,
   previousManifest: AssetloomManifest,
 ): Promise<void> {
-  if (!output.owned) {
-    return;
-  }
   const relative = manifestPath(projectRoot, output.destination);
   const previous = previousManifest.files[relative];
   if (previous !== undefined) {
@@ -325,13 +316,11 @@ export async function generate(
       (disposition === 'written' ? written : unchanged).push(
         output.destination,
       );
-      if (output.owned) {
-        selectedFiles[manifestPath(loaded.projectRoot, output.destination)] = {
+      selectedFiles[manifestPath(loaded.projectRoot, output.destination)] = {
           sha256: sha256(output.content),
           taskId: output.task.id,
           target: output.task.target,
-        };
-      }
+      };
     }
 
     const selectedTargetSet: ReadonlySet<string> = new Set(plan.targets);
@@ -351,11 +340,6 @@ export async function generate(
       plan.targets,
     );
     await manifestStore.save({ version: 1, files: nextFiles });
-    await new GitIgnoreManager(loaded.projectRoot).update(
-      Object.keys(nextFiles).map((relative) =>
-        path.resolve(loaded.projectRoot, relative),
-      ),
-    );
 
     return { plan, written, unchanged, removed };
   } finally {
@@ -396,11 +380,6 @@ export async function clean(
       targets,
     );
     await manifestStore.save({ version: 1, files: retainedFiles });
-    await new GitIgnoreManager(loaded.projectRoot).update(
-      Object.keys(retainedFiles).map((relative) =>
-        path.resolve(loaded.projectRoot, relative),
-      ),
-    );
     return removed;
   } finally {
     await lock.release();
