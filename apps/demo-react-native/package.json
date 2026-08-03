@@ -1,0 +1,37 @@
+{
+  "name": "assetloom-demo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "assets:consume": "node ./scripts/consume-assetloom-result.mjs",
+    "assets:generate": "assetloom generate -c config/base.assetloom.json -c config/demo-brand.assetloom.json --report --result-file react-native-demo.json && yarn assets:consume",
+    "assets:plan": "assetloom plan -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
+    "assets:report": "assetloom report -c config/base.assetloom.json -c config/demo-brand.assetloom.json",
+    "assets:verify": "assetloom verify -c config/base.assetloom.json -c config/demo-brand.assetloom.json && yarn assets:consume",
+    "android": "yarn assets:generate && react-native run-android",
+    "ios": "yarn assets:generate && react-native run-ios",
+    "start": "react-native start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-native": "0.86.2"
+  },
+  "devDependencies": {
+    "@babel/core": "7.28.5",
+    "@babel/runtime": "7.28.4",
+    "@react-native-community/cli": "20.1.1",
+    "@react-native-community/cli-platform-android": "20.1.1",
+    "@react-native-community/cli-platform-ios": "20.1.1",
+    "@react-native/babel-preset": "0.86.2",
+    "@react-native/metro-config": "0.86.2",
+    "@react-native/typescript-config": "0.86.2",
+    "@sapkalabs/assetloom": "workspace:^",
+    "@types/jest": "29.5.14",
+    "@types/react": "19.2.14",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

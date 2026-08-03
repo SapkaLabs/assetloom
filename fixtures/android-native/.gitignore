@@ -1,0 +1,11 @@
+.assetloom/
+app/src/main/res/mipmap-*/
+app/src/main/res/drawable-*/
+app/src/main/res/drawable-night-*/
+app/src/main/res/drawable/assetloom_splash_screen.xml
+app/src/main/res/values/assetloom.xml
+app/src/main/res/values-night/assetloom.xml
+app/src/main/res/values-v31/assetloom.xml
+.gradle/
+build/
+app/build/

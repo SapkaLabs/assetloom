@@ -1,0 +1,22 @@
+{
+  "metadata": {
+    "name": "Assetloom Demo Brand",
+    "description": "Reference white-label configuration with Android and iOS appearance variants."
+  },
+  "resources": {
+    "appIcon": {
+      "android": {
+        "adaptive": {
+          "background": {
+            "color": "#223153"
+          }
+        }
+      }
+    },
+    "notificationIcon": {
+      "android": {
+        "color": "#69E0BA"
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "project": {
+    "root": "."
+  },
+  "targets": {
+    "android": {
+      "enabled": true,
+      "resourceDirectory": "./app/src/main/res"
+    }
+  },
+  "resources": {
+    "appIcon": {
+      "type": "app-icon",
+      "android": {
+        "legacy": {
+          "source": "./source/icon.svg"
+        },
+        "adaptive": {
+          "foreground": {
+            "source": "./source/foreground.svg"
+          },
+          "background": {
+            "color": "#172033"
+          },
+          "monochrome": {
+            "source": "./source/foreground.svg"
+          }
+        }
+      }
+    },
+    "notification": {
+      "type": "notification-icon",
+      "android": {
+        "source": "./source/notification.svg",
+        "color": "#172033"
+      }
+    },
+    "splash": {
+      "type": "splash-screen",
+      "light": {
+        "image": "./source/splash.svg",
+        "backgroundColor": "#FFFFFF",
+        "imageWidth": 128
+      },
+      "dark": {
+        "image": "./source/splash.svg",
+        "backgroundColor": "#000000",
+        "imageWidth": 128
+      }
+    }
+  }
+}

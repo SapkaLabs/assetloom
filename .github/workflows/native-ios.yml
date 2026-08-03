@@ -1,0 +1,58 @@
+name: native-ios
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compile-native-resources:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.3.1
+          bundler-cache: true
+          working-directory: apps/demo-react-native
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn build
+
+      - name: Generate fixture resources
+        working-directory: fixtures/ios-native
+        run: node ../../packages/assetloom/lib/cli.js generate -c assetloom.json
+      - name: Verify fixture resources
+        working-directory: fixtures/ios-native
+        run: node ../../packages/assetloom/lib/cli.js verify -c assetloom.json
+      - name: Compile fixture with Xcode
+        working-directory: fixtures/ios-native
+        run: >-
+          xcodebuild
+          -project AssetloomFixture.xcodeproj
+          -scheme AssetloomFixture
+          -sdk iphonesimulator
+          -configuration Debug
+          CODE_SIGNING_ALLOWED=NO
+          build
+
+      - name: Install demo CocoaPods
+        working-directory: apps/demo-react-native
+        run: bundle exec pod install --project-directory=ios
+      - name: Generate bare React Native demo resources
+        run: yarn workspace assetloom-demo assets:generate
+      - name: Verify bare React Native demo resources
+        run: yarn workspace assetloom-demo assets:verify
+      - name: Compile bare React Native demo
+        working-directory: apps/demo-react-native/ios
+        run: >-
+          xcodebuild
+          -workspace AssetloomDemo.xcworkspace
+          -scheme AssetloomDemo
+          -sdk iphonesimulator
+          -configuration Debug
+          CODE_SIGNING_ALLOWED=NO
+          build

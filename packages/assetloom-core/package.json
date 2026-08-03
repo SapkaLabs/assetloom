@@ -1,0 +1,32 @@
+{
+  "name": "@sapkalabs/assetloom-core",
+  "version": "0.2.0",
+  "description": "Resource-neutral contracts and deterministic primitives for AssetLoom",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn build",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "6.0.3"
+  }
+}

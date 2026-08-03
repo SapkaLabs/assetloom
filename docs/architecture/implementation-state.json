@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "authoritativeScope": "native-android-ios-v1",
+  "lastUpdated": "2026-07-29",
+  "completed": [
+    "official platform research",
+    "architecture and ADRs",
+    "workspace and ESM package skeleton",
+    "ordered configuration merge and provenance",
+    "native-only JSON Schema",
+    "stable LoomError abstraction",
+    "deterministic planner",
+    "renderer and content cache",
+    "manifest, locking, atomic writes, safe cleanup",
+    "Android resource generation",
+    "iOS resource generation",
+    "bare React Native demo scaffold",
+    "native verification fixtures",
+    "native macOS and iOS Simulator verification",
+    "genuine Icon Composer directory compilation",
+    "security review",
+    "performance baseline",
+    "cross-platform and native CI definitions",
+    "per-configuration self-contained HTML asset reports",
+    "modular app icon, notification icon, and splash-screen report templates"
+  ],
+  "verification": {
+    "build": "pass",
+    "lint": "pass",
+    "typecheck": "pass-package-and-demo",
+    "tests": "pass-18",
+    "packageSmoke": "pass",
+    "androidNative": "pass-fixture-resources-and-demo-assembleDebug",
+    "iosPortable": "pass-catalog-images-storyboard-and-pbx-parse",
+    "iosNative": "pass-local-macos-26.5.1-xcode-26.2-fixture-and-demo",
+    "iosSimulator": "pass-demo-launched-ios-26.2",
+    "iconComposer": "pass-genuine-icon-directory-xcode-compile",
+    "determinism": "pass-zero-native-and-report-writes-on-unchanged-second-run",
+    "htmlReport": "pass-demo-56-outputs-10-sources-zero-issues-browser-reviewed",
+    "benchmark": "pass-darwin-arm64-node-26.3.0-cold-82.26ms-warm-8.14ms-zero-warm-writes"
+  },
+  "next": [
+    "obtain a green macOS native-ios workflow run",
+    "record release-CI benchmark baselines",
+    "replace the demo .icon placeholder before making a reproducible branded passthrough visual claim",
+    "review the packed release file list and record release checksums"
+  ]
+}

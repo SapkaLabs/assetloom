@@ -1,0 +1,35 @@
+{
+  "name": "@sapkalabs/assetloom-native",
+  "version": "0.2.0",
+  "description": "Android and iOS presets, roles, and usage descriptors for AssetLoom",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    }
+  },
+  "files": [
+    "lib",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn workspace @sapkalabs/assetloom-core build && yarn workspace @sapkalabs/assetloom-images build && yarn build",
+    "lint": "eslint src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@sapkalabs/assetloom-core": "workspace:^",
+    "@sapkalabs/assetloom-images": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}
