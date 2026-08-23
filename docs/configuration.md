@@ -231,8 +231,11 @@ Application notification code selects `assetloom_notification` and
 
 ## Schema version 1 splash screen
 
-Light is required and Dark is optional. `imageWidth` is the logical width in
-Android dp and iOS points:
+Light is required and Dark is optional. `imageWidth` and `imageHeight` are the
+logical dimensions in Android dp and iOS points. `imageHeight` defaults to
+`imageWidth` for existing square configurations. Optional footer `text` and
+`textColor` must be supplied together and are rendered in the iOS launch
+storyboard:
 
 ```json
 {
@@ -240,15 +243,23 @@ Android dp and iOS points:
   "light": {
     "image": "./assets/splash.svg",
     "backgroundColor": "#FFFFFF",
-    "imageWidth": 200
+    "imageWidth": 128,
+    "imageHeight": 96
   },
   "dark": {
     "image": "./assets/splash-dark.svg",
     "backgroundColor": "#000000",
-    "imageWidth": 200
-  }
+    "imageWidth": 128,
+    "imageHeight": 96
+  },
+  "text": "Copyright notice",
+  "textColor": "#FFFFFF"
 }
 ```
+
+On Android 12 and later, Assetloom creates a separate transparent 288 dp icon
+canvas and keeps the artwork inside the platform's 192 dp circular safe zone.
+The pre-Android 12 drawable keeps the configured logical dimensions.
 
 ## Ownership and state
 

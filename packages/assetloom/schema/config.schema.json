@@ -1430,6 +1430,11 @@
           "type": "number",
           "exclusiveMinimum": 0,
           "maximum": 1024
+        },
+        "imageHeight": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1024
         }
       }
     },
@@ -1449,7 +1454,22 @@
         },
         "dark": {
           "$ref": "#/$defs/splashAppearance"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "textColor": {
+          "$ref": "#/$defs/color"
         }
+      },
+      "dependentRequired": {
+        "text": [
+          "textColor"
+        ],
+        "textColor": [
+          "text"
+        ]
       }
     }
   }
