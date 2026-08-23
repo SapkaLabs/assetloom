@@ -71,7 +71,7 @@ function valuesV31Xml(): string {
   <style name="AssetloomTheme" parent="@style/AppTheme">
     <item name="android:windowBackground">@drawable/assetloom_splash_screen</item>
     <item name="android:windowSplashScreenBackground">@color/assetloom_splash_background</item>
-    <item name="android:windowSplashScreenAnimatedIcon">@drawable/assetloom_splash</item>
+    <item name="android:windowSplashScreenAnimatedIcon">@drawable/assetloom_splash_api31</item>
   </style>
 </resources>
 `;

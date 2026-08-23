@@ -28,7 +28,7 @@ function splashDevice(
         </div>
       </div>
       <strong>${escapeHtml(target === 'android' ? 'Android' : 'iOS')} · ${escapeHtml(appearance)}</strong>
-      <span>${escapeHtml(details.backgroundColor)} · ${details.imageWidth} logical px</span>
+      <span>${escapeHtml(details.backgroundColor)} · ${details.imageWidth} × ${details.imageHeight ?? details.imageWidth} logical px</span>
     </div>`;
 }
 
@@ -68,6 +68,7 @@ export function renderSplashScreen(resource: ReportResource): string {
         <p>Light and dark outputs on representative device canvases.</p>
       </div>
       <div class="context-grid splash-context-grid">${devices.join('')}</div>
+      ${config.text === undefined || config.textColor === undefined ? '' : `<p>iOS footer: ${escapeHtml(config.text)} · ${escapeHtml(config.textColor)}</p>`}
     </div>`;
   return renderResource(resource, showcase);
 }

@@ -14,12 +14,17 @@ const ANDROID_DENSITIES = [
   ['xxxhdpi', 4],
 ] as const;
 
+const ANDROID_SPLASH_CANVAS_DP = 288;
+const ANDROID_SPLASH_SAFE_ZONE_DP = 192;
+
 function renderTask(options: {
   id: string;
   resourceId: string;
   target: TargetPlatform;
   source: string;
   width: number;
+  height: number;
+  renderLayout?: GenerationTask['renderLayout'];
   destination: string;
 }): GenerationTask {
   return {
@@ -31,10 +36,36 @@ function renderTask(options: {
     renderMode: 'standard',
     sourceDependencies: [options.source],
     width: options.width,
-    height: options.width,
+    height: options.height,
+    ...(options.renderLayout === undefined
+      ? {}
+      : { renderLayout: options.renderLayout }),
     format: 'png',
     destination: options.destination,
-    presetVersion: '1',
+    presetVersion: '2',
+  };
+}
+
+function androidRenderDimensions(
+  appearance: SplashScreenResource['light'],
+  densityScale: number,
+): {
+  readonly canvas: number;
+  readonly contentWidth: number;
+  readonly contentHeight: number;
+} {
+  const imageHeight = appearance.imageHeight ?? appearance.imageWidth;
+  const safeZoneScale = Math.min(
+    1,
+    ANDROID_SPLASH_SAFE_ZONE_DP /
+      Math.hypot(appearance.imageWidth, imageHeight),
+  );
+  return {
+    canvas: Math.round(ANDROID_SPLASH_CANVAS_DP * densityScale),
+    contentWidth: Math.round(
+      appearance.imageWidth * safeZoneScale * densityScale,
+    ),
+    contentHeight: Math.round(imageHeight * safeZoneScale * densityScale),
   };
 }
 
@@ -53,6 +84,7 @@ export function planAndroidSplashScreen(
   }
   const tasks: GenerationTask[] = [];
   for (const [density, scale] of ANDROID_DENSITIES) {
+    const lightDimensions = androidRenderDimensions(resource.light, scale);
     tasks.push(
       renderTask({
         id: `${resourceId}:android:light:${density}`,
@@ -60,10 +92,31 @@ export function planAndroidSplashScreen(
         target: 'android',
         source: lightSource,
         width: Math.round(resource.light.imageWidth * scale),
+        height: Math.round(
+          (resource.light.imageHeight ?? resource.light.imageWidth) * scale,
+        ),
         destination: path.join(
           resourceDirectory,
           `drawable-${density}`,
           'assetloom_splash.png',
+        ),
+      }),
+      renderTask({
+        id: `${resourceId}:android:api31-light:${density}`,
+        resourceId,
+        target: 'android',
+        source: lightSource,
+        width: lightDimensions.canvas,
+        height: lightDimensions.canvas,
+        renderLayout: {
+          kind: 'centered-content',
+          width: lightDimensions.contentWidth,
+          height: lightDimensions.contentHeight,
+        },
+        destination: path.join(
+          resourceDirectory,
+          `drawable-${density}`,
+          'assetloom_splash_api31.png',
         ),
       }),
     );
@@ -75,6 +128,7 @@ export function planAndroidSplashScreen(
           message: `Missing resolved dark splash source for "${resourceId}".`,
         });
       }
+      const darkDimensions = androidRenderDimensions(resource.dark, scale);
       tasks.push(
         renderTask({
           id: `${resourceId}:android:dark:${density}`,
@@ -82,10 +136,31 @@ export function planAndroidSplashScreen(
           target: 'android',
           source: darkSource,
           width: Math.round(resource.dark.imageWidth * scale),
+          height: Math.round(
+            (resource.dark.imageHeight ?? resource.dark.imageWidth) * scale,
+          ),
           destination: path.join(
             resourceDirectory,
             `drawable-night-${density}`,
             'assetloom_splash.png',
+          ),
+        }),
+        renderTask({
+          id: `${resourceId}:android:api31-dark:${density}`,
+          resourceId,
+          target: 'android',
+          source: darkSource,
+          width: darkDimensions.canvas,
+          height: darkDimensions.canvas,
+          renderLayout: {
+            kind: 'centered-content',
+            width: darkDimensions.contentWidth,
+            height: darkDimensions.contentHeight,
+          },
+          destination: path.join(
+            resourceDirectory,
+            `drawable-night-${density}`,
+            'assetloom_splash_api31.png',
           ),
         }),
       );
@@ -120,6 +195,9 @@ export function planIosSplashScreen(
           target: 'ios',
           source,
           width: Math.round(details.imageWidth * scale),
+          height: Math.round(
+            (details.imageHeight ?? details.imageWidth) * scale,
+          ),
           destination: path.join(
             imageSet,
             `AssetloomSplash-${appearance}@${scale}x.png`,

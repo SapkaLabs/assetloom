@@ -57,6 +57,27 @@ export class SharpRenderer {
         context: { taskId: task.id, width: task.width, height: task.height },
       });
     }
+    if (
+      task.renderLayout !== undefined &&
+      (!Number.isSafeInteger(task.renderLayout.width) ||
+        !Number.isSafeInteger(task.renderLayout.height) ||
+        task.renderLayout.width <= 0 ||
+        task.renderLayout.height <= 0 ||
+        task.renderLayout.width > task.width ||
+        task.renderLayout.height > task.height)
+    ) {
+      throw new LoomError({
+        code: 'LOOM_RENDER_DIMENSION_INVALID',
+        message: `Render task "${task.id}" has an invalid centered content layout.`,
+        context: {
+          taskId: task.id,
+          outputWidth: task.width,
+          outputHeight: task.height,
+          contentWidth: task.renderLayout.width,
+          contentHeight: task.renderLayout.height,
+        },
+      });
+    }
     if (task.format !== 'png' && task.format !== 'webp') {
       throw new LoomError({
         code: 'LOOM_RENDER_FORMAT_UNSUPPORTED',
@@ -100,6 +121,7 @@ export class SharpRenderer {
       output: {
         width: task.width,
         height: task.height,
+        renderLayout: task.renderLayout,
         format: task.format,
         presetVersion: task.presetVersion,
         renderProfile,
@@ -126,10 +148,14 @@ export class SharpRenderer {
       })
         .timeout({ seconds: 30 })
         .rotate()
-        .resize(task.width, task.height, {
-          fit: 'contain',
-          background: { r: 0, g: 0, b: 0, alpha: 0 },
-        });
+        .resize(
+          task.renderLayout?.width ?? task.width,
+          task.renderLayout?.height ?? task.height,
+          {
+            fit: 'contain',
+            background: { r: 0, g: 0, b: 0, alpha: 0 },
+          },
+        );
       if (renderProfile.alpha === 'flatten-white') {
         pipeline = pipeline
           .flatten({ background: '#FFFFFF' })
@@ -141,6 +167,17 @@ export class SharpRenderer {
         pipeline = pipeline.greyscale().tint('#FFFFFF');
       } else if (renderProfile.color === 'tinted') {
         pipeline = pipeline.greyscale();
+      }
+      if (task.renderLayout !== undefined) {
+        const horizontalPadding = task.width - task.renderLayout.width;
+        const verticalPadding = task.height - task.renderLayout.height;
+        pipeline = sharp(await pipeline.png().toBuffer()).extend({
+          top: Math.floor(verticalPadding / 2),
+          bottom: Math.ceil(verticalPadding / 2),
+          left: Math.floor(horizontalPadding / 2),
+          right: Math.ceil(horizontalPadding / 2),
+          background: { r: 0, g: 0, b: 0, alpha: 0 },
+        });
       }
 
       const output =

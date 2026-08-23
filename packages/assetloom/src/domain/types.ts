@@ -17,6 +17,12 @@ export type GenerationOperation =
 
 export type GenerationRenderMode = 'standard' | 'monochrome' | 'tinted';
 
+export interface CenteredContentRenderLayout {
+  readonly kind: 'centered-content';
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface GenerationTask {
   id: string;
   resourceId: string;
@@ -27,6 +33,7 @@ export interface GenerationTask {
   sourceDependencies: string[];
   width?: number;
   height?: number;
+  renderLayout?: CenteredContentRenderLayout;
   format?: 'png' | 'webp' | 'json' | 'xml' | 'directory';
   destination: string;
   presetVersion: string;
@@ -84,12 +91,15 @@ export interface SplashAppearance {
   image: string;
   backgroundColor: string;
   imageWidth: number;
+  imageHeight?: number;
 }
 
 export interface SplashScreenResource {
   type: 'splash-screen';
   light: SplashAppearance;
   dark?: SplashAppearance;
+  text?: string;
+  textColor?: string;
 }
 
 export interface ConfigurationMetadata {
