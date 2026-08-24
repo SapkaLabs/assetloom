@@ -1,0 +1,41 @@
+name: native-android
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compile-native-resources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - run: yarn install --immutable
+      - run: yarn build
+
+      - name: Generate fixture resources
+        working-directory: fixtures/android-native
+        run: node ../../packages/assetloom/lib/cli.js generate -c assetloom.json
+      - name: Compile fixture resources with AAPT2
+        working-directory: fixtures/android-native
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:processDebugResources --stacktrace
+
+      - name: Generate bare React Native demo resources
+        run: yarn workspace assetloom-demo assets:generate
+      - name: Compile bare React Native demo resources
+        working-directory: apps/demo-react-native/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:processDebugResources --stacktrace
